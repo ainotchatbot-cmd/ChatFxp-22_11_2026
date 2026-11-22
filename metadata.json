@@ -1,0 +1,6 @@
+{
+  "name": "ChatFXP — קהילת הפנטזיה הגותית",
+  "description": "ChatFXP: More Than a Forum... A Hidden Community — הפורטל הישראלי המוביל לקהילות, פורומים, לוח יד שנייה ובידור.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

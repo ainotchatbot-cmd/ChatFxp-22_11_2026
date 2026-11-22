@@ -1,0 +1,719 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Cinzel Decorative", "Cinzel", "Frank Ruhl Libre", Georgia, serif;
+  --font-gothic: "Cinzel", "Frank Ruhl Libre", Georgia, serif;
+  --font-sans: "Heebo", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  --color-obsidian: #080609;
+  --color-panel: #100B10;
+  --color-panel-alt: #1A1018;
+  --color-blood: #FF1729;
+  --color-crimson: #8B0015;
+  --color-twilight: #39203F;
+  --color-silver: #B9B3C0;
+  --color-ivory: #F0E8EF;
+  --color-muted: #A99AA7;
+  --color-gold: #D5A64C;
+}
+
+:root {
+  --portal-max-width: 1640px;
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    background-color: #050408;
+    color: #F0E8EF;
+    scroll-behavior: smooth;
+    font-size: 16px;
+  }
+
+  /* Automatic Screen Size Scaling for Large Desktops, Ultra-Wide Monitors & TVs */
+  @media (min-width: 1920px) {
+    html[data-display-scale="auto"],
+    html:not([data-display-scale]) {
+      font-size: 16.5px;
+      --portal-max-width: 1840px;
+    }
+  }
+
+  @media (min-width: 2560px) {
+    html[data-display-scale="auto"],
+    html:not([data-display-scale]) {
+      font-size: 18.5px;
+      --portal-max-width: 2280px;
+    }
+  }
+
+  @media (min-width: 3400px) {
+    html[data-display-scale="auto"],
+    html:not([data-display-scale]) {
+      font-size: 21px;
+      --portal-max-width: 2880px;
+    }
+  }
+
+  html[data-display-scale="standard"] {
+    font-size: 16px;
+    --portal-max-width: 1640px;
+  }
+
+  html[data-display-scale="cinema"] {
+    font-size: 18px;
+    --portal-max-width: 2200px;
+  }
+
+  html[data-display-scale="tv"] {
+    font-size: 20.5px;
+    --portal-max-width: 2800px;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid #FFE39A;
+    outline-offset: 2px;
+  }
+
+  body {
+    background-color: #050408;
+    background-image:
+      radial-gradient(ellipse 80% 45% at 50% 0%, rgba(139, 0, 21, 0.14), transparent 70%),
+      radial-gradient(ellipse 60% 40% at 15% 50%, rgba(57, 32, 63, 0.12), transparent 65%),
+      radial-gradient(ellipse 60% 40% at 85% 50%, rgba(57, 32, 63, 0.12), transparent 65%);
+    min-height: 100vh;
+    overflow-x: hidden;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1, h2, h3 {
+    text-wrap: balance;
+    letter-spacing: -0.015em;
+  }
+
+  /* Custom Gothic Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #080609;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(180deg, #39203F 0%, #8B0015 100%);
+    border-radius: 4px;
+    border: 1px solid rgba(185, 179, 192, 0.15);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(180deg, #8B0015 0%, #FF1729 100%);
+  }
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.gothic-panel {
+  background: linear-gradient(180deg, rgba(28, 19, 27, 0.96) 0%, rgba(14, 10, 16, 0.99) 100%);
+  border: 1px solid rgba(213, 166, 76, 0.36);
+  box-shadow:
+    0 20px 44px -10px rgba(0, 0, 0, 0.94),
+    0 6px 18px rgba(0, 0, 0, 0.8),
+    0 0 0 1px rgba(42, 26, 12, 0.7),
+    inset 0 1px 0 rgba(255, 226, 154, 0.2);
+}
+
+.gothic-panel-crimson {
+  background: linear-gradient(180deg, rgba(33, 19, 28, 0.97) 0%, rgba(15, 9, 16, 0.99) 100%);
+  border: 1px solid rgba(213, 166, 76, 0.48);
+  box-shadow:
+    0 22px 48px -10px rgba(0, 0, 0, 0.95),
+    0 8px 24px rgba(139, 0, 21, 0.28),
+    0 0 0 1px rgba(255, 23, 41, 0.22),
+    inset 0 1px 0 rgba(255, 224, 150, 0.26);
+}
+
+/* 3D Raised Foreground Windows & Center Forum Stage — Hammered Bronze & Carved Obsidian Iron */
+.gothic-3d-window {
+  background: linear-gradient(180deg, rgba(30, 21, 30, 0.96) 0%, rgba(14, 10, 16, 0.99) 100%);
+  border: 1px solid rgba(213, 166, 76, 0.38);
+  box-shadow:
+    0 24px 52px -12px rgba(0, 0, 0, 0.95),
+    0 8px 20px rgba(0, 0, 0, 0.84),
+    0 0 0 1px rgba(18, 12, 8, 0.85),
+    inset 0 1px 0 rgba(255, 224, 155, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.72);
+}
+
+.gothic-3d-stage {
+  background: linear-gradient(180deg, rgba(24, 16, 24, 0.95) 0%, rgba(11, 8, 13, 0.99) 100%);
+  border: 1px solid rgba(213, 166, 76, 0.45);
+  box-shadow:
+    0 28px 64px -14px rgba(0, 0, 0, 0.97),
+    0 10px 28px rgba(139, 0, 21, 0.24),
+    0 0 0 1px rgba(255, 23, 41, 0.16),
+    inset 0 1px 0 rgba(255, 226, 154, 0.24),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.78);
+}
+
+.rpg-bronze-bezel {
+  background: linear-gradient(180deg, rgba(36, 25, 16, 0.95) 0%, rgba(16, 11, 12, 0.98) 100%);
+  border: 1px solid rgba(213, 166, 76, 0.52);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 228, 164, 0.26),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.85),
+    0 6px 18px rgba(0, 0, 0, 0.75);
+}
+
+.rpg-action-slot {
+  background: linear-gradient(180deg, rgba(31, 22, 29, 0.95) 0%, rgba(13, 9, 14, 0.99) 100%);
+  border: 1px solid rgba(184, 144, 72, 0.48);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 226, 160, 0.22),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.78),
+    0 3px 10px rgba(0, 0, 0, 0.68);
+  transition: border-color 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    background 160ms ease;
+}
+
+.rpg-action-slot:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 215, 120, 0.88);
+  box-shadow:
+    0 6px 18px -4px rgba(213, 166, 76, 0.36),
+    0 0 14px rgba(56, 189, 248, 0.16),
+    inset 0 1px 0 rgba(255, 236, 184, 0.38);
+}
+
+.rpg-gold-metal {
+  background: linear-gradient(
+    180deg,
+    #fff4d1 0%,
+    #f2cb72 34%,
+    #c69335 68%,
+    #ffe39b 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.95));
+}
+
+.gothic-mana-fill {
+  background: linear-gradient(90deg, #1d4ed8 0%, #2563eb 45%, #38bdf8 85%, #bae6fd 100%);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.7);
+}
+
+/* Boosted Thread — Breathing Arcane Glow + Diagonal Light Ripple */
+.gothic-boosted-thread {
+  position: relative;
+  background-image: linear-gradient(
+    108deg,
+    rgba(56, 189, 248, 0.08) 0%,
+    rgba(255, 23, 41, 0.07) 26%,
+    rgba(213, 166, 76, 0.15) 44%,
+    rgba(125, 211, 252, 0.23) 50%,
+    rgba(213, 166, 76, 0.15) 56%,
+    rgba(255, 23, 41, 0.07) 74%,
+    rgba(56, 189, 248, 0.08) 100%
+  );
+  background-size: 240% 100%;
+  box-shadow:
+    inset 0 0 0 1px rgba(56, 189, 248, 0.42),
+    inset 0 1px 0 rgba(186, 230, 253, 0.25),
+    0 6px 22px -8px rgba(56, 189, 248, 0.34);
+  animation:
+    chatfxpBoostedRipple 5.4s ease-in-out infinite,
+    chatfxpBoostedBreathe 3.6s ease-in-out infinite;
+}
+
+.gothic-boosted-thread:hover {
+  box-shadow:
+    inset 0 0 0 1px rgba(125, 211, 252, 0.72),
+    inset 0 1px 0 rgba(255, 226, 154, 0.36),
+    0 8px 26px -6px rgba(56, 189, 248, 0.45),
+    0 0 14px rgba(213, 166, 76, 0.2);
+}
+
+/* Smoked Bronze-Tinted Liquid Glass (Floating Windows, Popups, Dropdowns & Boards) */
+.liquid-glass-bronze {
+  background: linear-gradient(
+    158deg,
+    rgba(34, 22, 21, 0.8) 0%,
+    rgba(17, 11, 14, 0.86) 52%,
+    rgba(26, 17, 13, 0.82) 100%
+  );
+  backdrop-filter: blur(20px) saturate(152%);
+  -webkit-backdrop-filter: blur(20px) saturate(152%);
+  border: 1px solid rgba(213, 166, 76, 0.5);
+  box-shadow:
+    0 28px 68px -12px rgba(0, 0, 0, 0.94),
+    0 10px 30px -6px rgba(213, 166, 76, 0.16),
+    0 0 0 1px rgba(18, 12, 8, 0.72),
+    inset 0 1px 0 rgba(255, 228, 168, 0.32),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.8);
+}
+
+.liquid-glass-obsidian {
+  background: linear-gradient(
+    180deg,
+    rgba(26, 17, 23, 0.97) 0%,
+    rgba(11, 8, 13, 0.99) 100%
+  );
+  border: 1px solid rgba(213, 166, 76, 0.52);
+  box-shadow:
+    0 28px 68px -12px rgba(0, 0, 0, 0.97),
+    0 0 0 1px rgba(18, 12, 8, 0.85),
+    inset 0 1px 0 rgba(255, 228, 168, 0.26),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.85);
+}
+
+.liquid-glass-dropdown {
+  background: linear-gradient(
+    162deg,
+    rgba(36, 23, 21, 0.85) 0%,
+    rgba(15, 10, 14, 0.9) 55%,
+    rgba(24, 15, 12, 0.87) 100%
+  );
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  border: 1px solid rgba(213, 166, 76, 0.48);
+  box-shadow:
+    0 22px 52px -10px rgba(0, 0, 0, 0.95),
+    0 0 24px -6px rgba(255, 23, 41, 0.22),
+    inset 0 1px 0 rgba(255, 228, 168, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.78);
+  animation: chatfxpDropdownIn 180ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.liquid-glass-subcard {
+  background: linear-gradient(
+    180deg,
+    rgba(22, 15, 19, 0.66) 0%,
+    rgba(11, 8, 12, 0.74) 100%
+  );
+  border: 1px solid rgba(213, 166, 76, 0.24);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 226, 164, 0.14),
+    0 8px 22px -10px rgba(0, 0, 0, 0.75);
+}
+
+/* Tri-Tone 3D Hover Accents: Burnished Gold, Ruby Ember & Arcane Cyan */
+.tri-hover-gold,
+.tri-hover-ruby,
+.tri-hover-cyan {
+  transition:
+    transform 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.tri-hover-gold:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 224, 146, 0.85);
+  box-shadow:
+    0 6px 18px -6px rgba(213, 166, 76, 0.45),
+    inset 0 1px 0 rgba(255, 238, 192, 0.34);
+}
+
+.tri-hover-ruby:hover {
+  transform: translateY(-1px);
+  border-color: rgba(255, 62, 78, 0.85);
+  box-shadow:
+    0 6px 20px -6px rgba(255, 23, 41, 0.48),
+    inset 0 1px 0 rgba(255, 180, 188, 0.28);
+}
+
+.tri-hover-cyan:hover {
+  transform: translateY(-1px);
+  border-color: rgba(125, 211, 252, 0.88);
+  box-shadow:
+    0 6px 20px -6px rgba(56, 189, 248, 0.46),
+    inset 0 1px 0 rgba(186, 230, 253, 0.32);
+}
+
+.floating-window-enter {
+  animation: chatfxpFloatingIn 190ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.floating-window-exit {
+  animation: chatfxpFloatingOut 150ms cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+.gothic-metal-text {
+  background: linear-gradient(
+    180deg,
+    #ffffff 0%,
+    #efe6d6 30%,
+    #c4b7be 55%,
+    #776b79 75%,
+    #f2e5d3 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 3px 10px rgba(0, 0, 0, 0.94)) drop-shadow(0 0 18px rgba(255, 23, 41, 0.45));
+}
+
+/* Pride Sanctum ("Gay & Proud") Stained-Glass Gothic Prism Accents */
+.gothic-pride-border {
+  border: 1px solid rgba(236, 72, 153, 0.58);
+  box-shadow:
+    0 0 0 1px rgba(213, 166, 76, 0.28),
+    0 12px 32px -10px rgba(236, 72, 153, 0.28),
+    0 0 24px -6px rgba(56, 189, 248, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+
+.gothic-pride-ribbon {
+  height: 3px;
+  background: linear-gradient(
+    90deg,
+    #ff3b5c 0%,
+    #fb923c 18%,
+    #facc15 36%,
+    #34d399 54%,
+    #38bdf8 74%,
+    #c084fc 90%,
+    #ff3b5c 100%
+  );
+}
+
+.gothic-pride-text {
+  background: linear-gradient(
+    90deg,
+    #ff8da1 0%,
+    #fde047 28%,
+    #6ee7b7 54%,
+    #7dd3fc 78%,
+    #e879f9 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.gothic-crimson-btn {
+  background: linear-gradient(180deg, #ff2a3c 0%, #c40a1d 55%, #72000f 100%);
+  border: 1px solid rgba(242, 195, 114, 0.56);
+  box-shadow:
+    0 4px 16px rgba(255, 23, 41, 0.34),
+    inset 0 1px 0 rgba(255, 224, 182, 0.38),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55);
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 160ms ease,
+    border-color 160ms ease,
+    background 160ms ease;
+}
+
+.gothic-crimson-btn:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(180deg, #ff3e4e 0%, #dc0e22 55%, #8b0015 100%);
+  border-color: rgba(255, 220, 145, 0.88);
+  box-shadow:
+    0 8px 24px rgba(255, 23, 41, 0.52),
+    0 0 14px rgba(213, 166, 76, 0.3),
+    inset 0 1px 0 rgba(255, 236, 198, 0.48);
+}
+
+.gothic-slate-btn {
+  background: linear-gradient(180deg, rgba(44, 29, 41, 0.9) 0%, rgba(19, 13, 20, 0.96) 100%);
+  border: 1px solid rgba(213, 166, 76, 0.32);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 226, 164, 0.16),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6);
+  transition: transform 150ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.gothic-slate-btn:hover {
+  transform: translateY(-1px);
+  border-color: rgba(213, 166, 76, 0.72);
+  box-shadow:
+    0 6px 16px -4px rgba(213, 166, 76, 0.28),
+    inset 0 1px 0 rgba(255, 226, 164, 0.26);
+}
+
+@keyframes chatfxpEmberRise {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.8);
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.75;
+  }
+  70% {
+    opacity: 0.45;
+  }
+  100% {
+    transform: translate3d(24px, -92vh, 0) scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes chatfxpSnowFall {
+  0% {
+    transform: translate3d(0, -8vh, 0) rotate(0deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.7;
+  }
+  50% {
+    transform: translate3d(18px, 46vh, 0) rotate(120deg);
+    opacity: 0.55;
+  }
+  88% {
+    opacity: 0.5;
+  }
+  100% {
+    transform: translate3d(-14px, 104vh, 0) rotate(240deg);
+    opacity: 0;
+  }
+}
+
+@keyframes chatfxpDustFloat {
+  0% {
+    transform: translate3d(0, 0, 0) scale(0.9);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.6;
+  }
+  50% {
+    transform: translate3d(-22px, -28px, 0) scale(1.15);
+    opacity: 0.75;
+  }
+  80% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: translate3d(18px, -64px, 0) scale(0.85);
+    opacity: 0;
+  }
+}
+
+@keyframes chatfxpCandleFlicker {
+  0%, 100% {
+    opacity: 0.62;
+    transform: scale(1) translate3d(0, 0, 0);
+  }
+  22% {
+    opacity: 0.78;
+    transform: scale(1.04) translate3d(2px, -3px, 0);
+  }
+  47% {
+    opacity: 0.52;
+    transform: scale(0.97) translate3d(-2px, 1px, 0);
+  }
+  71% {
+    opacity: 0.84;
+    transform: scale(1.06) translate3d(1px, -2px, 0);
+  }
+}
+
+@keyframes chatfxpBadgeCelebrate {
+  0% {
+    transform: scale(0.92);
+    filter: brightness(1);
+  }
+  40% {
+    transform: scale(1.08);
+    filter: brightness(1.32);
+  }
+  70% {
+    transform: scale(0.98);
+    filter: brightness(1.12);
+  }
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+}
+
+@keyframes chatfxpBadgeShimmer {
+  0% {
+    transform: translate3d(-130%, 0, 0) skewX(-22deg);
+    opacity: 0;
+  }
+  25% {
+    opacity: 0.65;
+  }
+  60% {
+    transform: translate3d(170%, 0, 0) skewX(-22deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translate3d(170%, 0, 0) skewX(-22deg);
+    opacity: 0;
+  }
+}
+
+.achievement-unlocked-card {
+  position: relative;
+  overflow: hidden;
+  transition: transform 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.achievement-unlocked-card:hover {
+  transform: translateY(-2px);
+}
+
+.achievement-unlocked-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 224, 150, 0.2), transparent);
+  pointer-events: none;
+  animation: chatfxpBadgeShimmer 5.5s ease-in-out infinite;
+}
+
+.achievement-celebrate-pulse {
+  animation: chatfxpBadgeCelebrate 750ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes chatfxpBloodMoonPulse {
+  0%, 100% {
+    opacity: 0.42;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.78;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes chatfxpCrimsonWisp {
+  0% {
+    opacity: 0.15;
+    transform: translate3d(0, 0, 0) scale(0.75);
+  }
+  45% {
+    opacity: 0.9;
+    transform: translate3d(12px, -22px, 0) scale(1.25);
+  }
+  100% {
+    opacity: 0.15;
+    transform: translate3d(-8px, -44px, 0) scale(0.8);
+  }
+}
+
+.gothic-rare-silver-card {
+  border-color: rgba(226, 220, 232, 0.78);
+  box-shadow:
+    0 0 18px rgba(226, 220, 232, 0.24),
+    inset 0 0 12px rgba(226, 220, 232, 0.1);
+}
+
+.gothic-rare-silver-card:hover {
+  border-color: #ffffff;
+  box-shadow:
+    0 0 26px rgba(235, 230, 244, 0.42),
+    inset 0 0 16px rgba(235, 230, 244, 0.16);
+}
+
+@keyframes chatfxpBoostedRipple {
+  0% {
+    background-position: 120% 0%;
+  }
+  50% {
+    background-position: -20% 0%;
+  }
+  100% {
+    background-position: 120% 0%;
+  }
+}
+
+@keyframes chatfxpBoostedBreathe {
+  0%, 100% {
+    filter: brightness(1) saturate(1);
+  }
+  50% {
+    filter: brightness(1.12) saturate(1.1);
+  }
+}
+
+@keyframes chatfxpDropdownIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -6px, 0) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes chatfxpFloatingIn {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, 12px, 0) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+@keyframes chatfxpFloatingOut {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0) scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Shadow Sanctum Protected AdSense Container Layering */
+.shadow-sanctum-shell {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative;
+  z-index: 20;
+  isolation: isolate;
+}
+
+.shadow-sanctum-guard {
+  pointer-events: none;
+  box-shadow:
+    inset 0 0 0 1px rgba(213, 166, 76, 0.24),
+    inset 0 0 24px rgba(5, 3, 8, 0.55);
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+
