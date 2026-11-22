@@ -27,7 +27,7 @@ import {
   parseFoundItems,
   totalFoundItemsCount,
 } from '../data/relicVault';
-import { AuthProviderKind, LanguageCode, PortalUser } from '../types';
+import { AuthProviderKind, LanguageCode, OAuthProviderDescriptor, PortalUser } from '../types';
 import { useSidebarCollapse } from '../utils/useSidebarCollapse';
 import { BadgeEmblemSvg } from './AchievementBadge';
 import { CosmeticUsername } from './CosmeticUsername';
@@ -56,6 +56,9 @@ interface LeftSidebarProps {
   onOpenAdmin: () => void;
   onGoogleSignIn: () => void;
   onSignInWithProvider?: (provider: AuthProviderKind) => void;
+  oauthProviders?: OAuthProviderDescriptor[];
+  loadingOAuthProvider?: AuthProviderKind | null;
+  onOpenAuthModal?: () => void;
   onClaimDailyBonus: () => void;
 }
 
@@ -79,6 +82,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onOpenAdmin,
   onGoogleSignIn,
   onSignInWithProvider,
+  oauthProviders,
+  loadingOAuthProvider,
+  onOpenAuthModal,
   onClaimDailyBonus,
 }) => {
   const [editingNick, setEditingNick] = useState(false);
@@ -376,6 +382,9 @@ export const LeftSidebar: React.FC<LeftSidebarProps> = ({
                   <SsoButtons
                     lang={lang}
                     variant="stack"
+                    providers={oauthProviders}
+                    loadingProvider={loadingOAuthProvider}
+                    onOpenAuthModal={onOpenAuthModal}
                     onSelectProvider={(provider) =>
                       onSignInWithProvider ? onSignInWithProvider(provider) : onGoogleSignIn()
                     }

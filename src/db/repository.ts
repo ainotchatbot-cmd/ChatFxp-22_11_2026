@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gte, ilike, isNull, or, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
-import { evaluateUserAchievements, EvaluatedAchievement } from '../data/achievements.ts';
+import { evaluateUserAchievements } from '../data/achievements.ts';
+import type { EvaluatedAchievement } from '../data/achievements.ts';
 import {
   DAILY_QUEST_CATALOG,
   MANA_PRESTIGE_BADGES,
@@ -10,17 +11,22 @@ import {
 import {
   canAffordCosmetic,
   COSMETIC_REWARDS_CATALOG,
-  FoundToolId,
   parseFoundItems,
   parseUnlockedCosmetics,
   pickWeightedRandomTool,
 } from '../data/relicVault.ts';
+import type { FoundToolId } from '../data/relicVault.ts';
 import {
   canClaimDailyToday,
   computeDailyReward,
-  EndorsementCategory,
   getUtcDayKey,
 } from '../data/reputation.ts';
+import {
+  computeSectionActivityHeatmap,
+  getPortalHour,
+  incrementHourlyHitsJson,
+} from '../data/activityHeatmap.ts';
+import type { EndorsementCategory } from '../data/reputation.ts';
 import {
   ALLOWED_PULSE_CITIES,
   ALLOWED_PULSE_INTERESTS,
@@ -773,16 +779,22 @@ export async function recordSectionVisit(sectionId: string) {
     const cleanId = sectionId.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 48);
     if (!cleanId) return null;
     const key = `section_hits:${cleanId}`;
-    const [existing] = await db.select().from(siteSettings).where(eq(siteSettings.key, key)).limit(1);
+    const hourlyKey = `section_hourly_hits:${cleanId}`;
+    const currentHour = getPortalHour(new Date()) ?? new Date().getUTCHours();
+    const [[existing], [existingHourly]] = await Promise.all([
+      db.select().from(siteSettings).where(eq(siteSettings.key, key)).limit(1),
+      db.select().from(siteSettings).where(eq(siteSettings.key, hourlyKey)).limit(1),
+    ]);
     const nextHits = (Number(existing?.value || 0) || 0) + 1;
-    if (existing) {
-      await db
-        .update(siteSettings)
-        .set({ value: String(nextHits) })
-        .where(eq(siteSettings.key, key));
-    } else {
-      await db.insert(siteSettings).values({ key, value: String(nextHits) });
-    }
+    const nextHourlyJson = incrementHourlyHitsJson(existingHourly?.value, currentHour);
+    await Promise.all([
+      existing
+        ? db.update(siteSettings).set({ value: String(nextHits) }).where(eq(siteSettings.key, key))
+        : db.insert(siteSettings).values({ key, value: String(nextHits) }),
+      existingHourly
+        ? db.update(siteSettings).set({ value: nextHourlyJson }).where(eq(siteSettings.key, hourlyKey))
+        : db.insert(siteSettings).values({ key: hourlyKey, value: nextHourlyJson }),
+    ]);
     return { sectionId: cleanId, hits: nextHits, heatDelta: 140 };
   } catch (error) {
     throw sanitizeError('recordSectionVisit failed', error);
@@ -1472,6 +1484,12 @@ export async function getAdminOverviewData() {
       statsUsers,
       allFanBases,
       settingsRows,
+      allForums,
+      heatThreads,
+      heatPosts,
+      heatListings,
+      heatFanBasePosts,
+      heatXpTx,
     ] = await Promise.all([
       db.select().from(users).orderBy(desc(users.xp)).limit(50),
       db
@@ -1509,9 +1527,61 @@ export async function getAdminOverviewData() {
       db.select({ c: count() }).from(users),
       db.select().from(fanBases).orderBy(desc(fanBases.isPride), desc(fanBases.membersCount)),
       db.select().from(siteSettings),
+      db.select({ id: forums.id, slug: forums.slug }).from(forums),
+      db
+        .select({
+          id: threads.id,
+          forumId: threads.forumId,
+          viewsCount: threads.viewsCount,
+          repliesCount: threads.repliesCount,
+          likesCount: threads.likesCount,
+          manaBoostCount: threads.manaBoostCount,
+          manaBoostUntil: threads.manaBoostUntil,
+          isHot: threads.isHot,
+          createdAt: threads.createdAt,
+        })
+        .from(threads)
+        .where(eq(threads.isDeleted, false))
+        .orderBy(desc(threads.createdAt))
+        .limit(400),
+      db
+        .select({ threadId: posts.threadId, createdAt: posts.createdAt })
+        .from(posts)
+        .where(eq(posts.isDeleted, false))
+        .orderBy(desc(posts.createdAt))
+        .limit(600),
+      db
+        .select({ createdAt: marketplaceListings.createdAt })
+        .from(marketplaceListings)
+        .orderBy(desc(marketplaceListings.createdAt))
+        .limit(300),
+      db
+        .select({ createdAt: fanBasePosts.createdAt })
+        .from(fanBasePosts)
+        .orderBy(desc(fanBasePosts.createdAt))
+        .limit(300),
+      db
+        .select({
+          amount: xpTransactions.amount,
+          reason: xpTransactions.reason,
+          createdAt: xpTransactions.createdAt,
+        })
+        .from(xpTransactions)
+        .orderBy(desc(xpTransactions.createdAt))
+        .limit(400),
     ]);
 
     const settingsMap = Object.fromEntries(settingsRows.map((s) => [s.key, s.value]));
+    const { sectionHeat, activityHeatmap } = computeSectionActivityHeatmap({
+      forums: allForums,
+      threads: heatThreads,
+      posts: heatPosts,
+      listings: heatListings,
+      fanBases: allFanBases.map((fb) => ({ membersCount: fb.membersCount })),
+      fanBasePosts: heatFanBasePosts,
+      xpTransactions: heatXpTx,
+      settingsMap,
+    });
 
     return {
       stats: {
@@ -1530,6 +1600,8 @@ export async function getAdminOverviewData() {
         publisherId: settingsMap['adsense_publisher_id'] ?? '',
         enabled: settingsMap['adsense_enabled'] === 'true',
       },
+      sectionHeat,
+      activityHeatmap,
     };
   } catch (error) {
     throw sanitizeError('getAdminOverviewData failed', error);

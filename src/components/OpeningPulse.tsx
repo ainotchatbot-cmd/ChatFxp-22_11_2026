@@ -27,6 +27,7 @@ import {
   LanguageCode,
   NavSectionId,
   NewsItemRecord,
+  OAuthProviderDescriptor,
   OpeningPulseTab,
   PortalUser,
   ThreadSummary,
@@ -52,6 +53,9 @@ interface OpeningPulseProps {
   onDetectLocation: () => void;
   locating: boolean;
   onSignInWithProvider: (provider: AuthProviderKind) => void;
+  oauthProviders?: OAuthProviderDescriptor[];
+  loadingOAuthProvider?: AuthProviderKind | null;
+  onOpenAuthModal?: () => void;
   onSelectSection: (section: NavSectionId) => void;
   onOpenThreadInline: (threadId: number) => void;
   onSelectNews: (news: NewsItemRecord) => void;
@@ -105,6 +109,9 @@ export const OpeningPulse: React.FC<OpeningPulseProps> = ({
   onDetectLocation,
   locating,
   onSignInWithProvider,
+  oauthProviders,
+  loadingOAuthProvider,
+  onOpenAuthModal,
   onSelectSection,
   onOpenThreadInline,
   onSelectNews,
@@ -330,6 +337,9 @@ export const OpeningPulse: React.FC<OpeningPulseProps> = ({
             <SsoButtons
               lang={lang}
               compact
+              providers={oauthProviders}
+              loadingProvider={loadingOAuthProvider}
+              onOpenAuthModal={onOpenAuthModal}
               onSelectProvider={onSignInWithProvider}
             />
           </div>

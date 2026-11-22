@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import crypto from 'crypto';
-import express, { NextFunction, Request, Response } from 'express';
+import express from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import http from 'http';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -54,8 +55,26 @@ import {
 import { ALLOWED_PULSE_CITIES, ALLOWED_PULSE_INTERESTS } from './src/data/pulseConfig.ts';
 import type { EndorsementCategory } from './src/data/reputation.ts';
 import { getOrCreateUser } from './src/db/users.ts';
-import { adminAuth } from './src/lib/firebase-admin.ts';
-import { AuthRequest, optionalAuth, requireAuth, requireModeratorOrAdmin } from './src/middleware/auth.ts';
+import {
+  createOAuthAuthorizeUrl,
+  exchangeOAuthCodeForProfile,
+  getOAuthProvidersStatus,
+  renderOAuthCallbackHtml,
+  signModularOAuthToken,
+  verifyOAuthStateToken,
+} from './src/lib/oauth-server.ts';
+import {
+  decodeBase64DataUrl,
+  getMediaObjectResponse,
+  uploadMediaObject,
+} from './src/lib/s3-storage.ts';
+import {
+  optionalAuth,
+  requireAuth,
+  requireModeratorOrAdmin,
+  verifyNodeUnifiedToken,
+} from './src/middleware/auth.ts';
+import type { AuthRequest } from './src/middleware/auth.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -140,12 +159,12 @@ async function startServer() {
         };
 
         if (msg.type === 'auth' && msg.token) {
-          const decoded = await adminAuth.verifyIdToken(msg.token);
+          const identity = await verifyNodeUnifiedToken(msg.token);
           const dbUser = await getOrCreateUser({
-            uid: decoded.uid,
-            email: decoded.email || `${decoded.uid}@chatfxp.com`,
-            displayName: decoded.name,
-            avatarUrl: decoded.picture,
+            uid: identity.uid,
+            email: identity.email || `${identity.uid}@chatfxp.com`,
+            displayName: identity.name,
+            avatarUrl: identity.picture,
           });
           ws.userId = dbUser.id;
           ws.username = dbUser.username;
@@ -179,7 +198,7 @@ async function startServer() {
     res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
     next();
   });
-  app.use(express.json({ limit: '2mb' }));
+  app.use(express.json({ limit: '6mb' }));
 
   // SEO files
   app.get('/robots.txt', (_req, res) => {
@@ -200,6 +219,112 @@ async function startServer() {
   app.get('/api/health', (_req, res) => {
     res.json({ ok: true, service: 'ChatFXP.com' });
   });
+
+  // Modular OAuth Login System Routes
+  app.get('/api/auth/providers', (_req, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.json({ providers: getOAuthProvidersStatus() });
+  });
+
+  app.get('/api/auth/oauth/:provider/url', async (req, res) => {
+    try {
+      const providerId = String(req.params.provider || '').trim().toLowerCase();
+      const requestOrigin = typeof req.headers.origin === 'string' ? req.headers.origin : null;
+      const result = await createOAuthAuthorizeUrl({
+        providerId,
+        requestOrigin,
+      });
+      res.setHeader(
+        'Set-Cookie',
+        `chatfxp_oauth_nonce=${encodeURIComponent(result.stateNonce)}; Path=/; HttpOnly; Secure; SameSite=None; Partitioned; Max-Age=600`
+      );
+      res.setHeader('Cache-Control', 'no-store');
+      res.json({ url: result.url, redirectUri: result.redirectUri, provider: providerId });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Unable to start OAuth login.';
+      const status = message.includes('Unsupported') ? 400 : 503;
+      res.status(status).json({ error: message });
+    }
+  });
+
+  const handleNodeOAuthCallback = async (req: Request, res: Response) => {
+    const providerId = String(req.params.provider || '').trim().toLowerCase();
+    const code = typeof req.query.code === 'string' ? req.query.code : '';
+    const state = typeof req.query.state === 'string' ? req.query.state : '';
+    const oauthError = typeof req.query.error === 'string' ? req.query.error : '';
+
+    if (oauthError || !code || !state) {
+      return res
+        .status(400)
+        .type('text/html')
+        .send(
+          renderOAuthCallbackHtml({
+            ok: false,
+            provider: providerId,
+            error: oauthError || 'Authorization code or state missing.',
+          })
+        );
+    }
+
+    try {
+      const verifiedState = await verifyOAuthStateToken(state, providerId);
+      const profile = await exchangeOAuthCodeForProfile({
+        providerId,
+        code,
+        redirectUri: verifiedState.redirectUri,
+      });
+      const dbUser = await getOrCreateUser({
+        uid: profile.uid,
+        email: profile.email,
+        displayName: profile.displayName,
+        avatarUrl: profile.avatarUrl,
+      });
+      if (dbUser.isBanned) {
+        return res
+          .status(403)
+          .type('text/html')
+          .send(
+            renderOAuthCallbackHtml({
+              ok: false,
+              provider: providerId,
+              error: 'Account suspended by community moderation.',
+            })
+          );
+      }
+
+      const sessionToken = await signModularOAuthToken(profile);
+      res.setHeader('Cache-Control', 'no-store');
+      return res.type('text/html').send(
+        renderOAuthCallbackHtml({
+          ok: true,
+          provider: providerId,
+          token: sessionToken,
+          user: {
+            id: dbUser.id,
+            uid: dbUser.uid,
+            username: dbUser.username,
+            displayName: dbUser.displayName,
+            avatarUrl: dbUser.avatarUrl,
+            role: dbUser.role,
+          },
+        })
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'OAuth login failed.';
+      return res
+        .status(401)
+        .type('text/html')
+        .send(
+          renderOAuthCallbackHtml({
+            ok: false,
+            provider: providerId,
+            error: message,
+          })
+        );
+    }
+  };
+
+  app.get(['/auth/callback/:provider', '/auth/callback/:provider/'], handleNodeOAuthCallback);
 
   // Portal Bootstrap
   app.get('/api/portal/bootstrap', optionalAuth, async (req: AuthRequest, res) => {
@@ -1478,6 +1603,62 @@ async function startServer() {
 
     res.setHeader('Cache-Control', 'no-store');
     res.status(201).json(reply);
+  });
+
+  // S3-Compatible Object Storage (Cloudflare R2 S3 API / AWS S3 / Backblaze B2)
+  app.post('/api/media/upload', rateLimitWrite, optionalAuth, async (req: AuthRequest, res) => {
+    const shadowToken = req.header('x-shadow-token');
+    const shadowVerified = shadowToken ? verifyShadowBlindToken(shadowToken).valid : false;
+    if (!req.dbUser && !shadowVerified) {
+      return res.status(401).json({ error: 'Authentication or valid anonymous relay token required.' });
+    }
+    const { dataUrl, folder } = (req.body || {}) as { dataUrl?: unknown; folder?: unknown };
+    if (typeof dataUrl !== 'string') {
+      return res.status(400).json({ error: 'Expected image dataUrl payload.' });
+    }
+    try {
+      const decoded = decodeBase64DataUrl(dataUrl);
+      const uploaded = await uploadMediaObject(
+        {
+          s3Endpoint: process.env.S3_ENDPOINT,
+          s3Bucket: process.env.S3_BUCKET,
+          s3AccessKeyId: process.env.S3_ACCESS_KEY_ID,
+          s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+          s3Region: process.env.S3_REGION || 'auto',
+          s3PublicUrl: process.env.S3_PUBLIC_URL,
+        },
+        {
+          bytes: decoded.bytes,
+          contentType: decoded.contentType,
+          ext: decoded.ext,
+          folder: typeof folder === 'string' ? folder : 'uploads',
+        }
+      );
+      res.status(201).json(uploaded);
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Media upload failed.';
+      const status = message.includes('not configured') ? 503 : 400;
+      res.status(status).json({ error: message });
+    }
+  });
+
+  app.get('/api/media/*', async (req, res) => {
+    const rawKey = (req.params as Record<string, string>)[0] || req.path.replace(/^\/api\/media\//, '');
+    const response = await getMediaObjectResponse(
+      {
+        s3Endpoint: process.env.S3_ENDPOINT,
+        s3Bucket: process.env.S3_BUCKET,
+        s3AccessKeyId: process.env.S3_ACCESS_KEY_ID,
+        s3SecretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+        s3Region: process.env.S3_REGION || 'auto',
+        s3PublicUrl: process.env.S3_PUBLIC_URL,
+      },
+      rawKey
+    );
+    res.status(response.status);
+    response.headers.forEach((value, key) => res.setHeader(key, value));
+    const buf = Buffer.from(await response.arrayBuffer());
+    res.send(buf);
   });
 
   // Vite Dev Middleware or Static Production Build

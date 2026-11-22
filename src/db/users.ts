@@ -4,10 +4,13 @@ import { users } from './schema.ts';
 
 const DEFAULT_SUPER_ADMIN_EMAILS = ['ainotchatbot@gmail.com'];
 
-export function isSuperAdminEmail(email?: string | null): boolean {
+export function isSuperAdminEmail(email?: string | null, extraEmails?: string): boolean {
   if (!email) return false;
   const normalized = email.trim().toLowerCase();
-  const envList = (process.env.SUPER_ADMIN_EMAILS || '')
+  const envRaw =
+    extraEmails ??
+    (typeof process !== 'undefined' && process.env ? process.env.SUPER_ADMIN_EMAILS || '' : '');
+  const envList = envRaw
     .split(',')
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);

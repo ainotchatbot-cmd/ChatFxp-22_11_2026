@@ -1,7 +1,8 @@
-import { NextFunction, Request, Response } from 'express';
-import { DecodedIdToken } from 'firebase-admin/auth';
+import type { NextFunction, Request, Response } from 'express';
+import type { DecodedIdToken } from 'firebase-admin/auth';
 import { getOrCreateUser } from '../db/users.ts';
 import { adminAuth } from '../lib/firebase-admin.ts';
+import { isModularOAuthToken, verifyModularOAuthToken } from '../lib/oauth-server.ts';
 
 export interface DbUserRecord {
   id: number;
@@ -26,6 +27,32 @@ export interface AuthRequest extends Request {
   dbUser?: DbUserRecord;
 }
 
+export async function verifyNodeUnifiedToken(token: string): Promise<{
+  uid: string;
+  email?: string;
+  name?: string;
+  picture?: string;
+  firebaseDecoded?: DecodedIdToken;
+}> {
+  if (isModularOAuthToken(token)) {
+    const decoded = await verifyModularOAuthToken(token);
+    return {
+      uid: decoded.uid,
+      email: decoded.email,
+      name: decoded.name,
+      picture: decoded.picture,
+    };
+  }
+  const decodedToken = await adminAuth.verifyIdToken(token);
+  return {
+    uid: decodedToken.uid,
+    email: decodedToken.email,
+    name: decodedToken.name,
+    picture: decodedToken.picture,
+    firebaseDecoded: decodedToken,
+  };
+}
+
 export const requireAuth = async (req: AuthRequest, res: Response, next: NextFunction) => {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -34,14 +61,16 @@ export const requireAuth = async (req: AuthRequest, res: Response, next: NextFun
 
   const token = authHeader.split('Bearer ')[1];
   try {
-    const decodedToken = await adminAuth.verifyIdToken(token);
-    req.firebaseUser = decodedToken;
+    const identity = await verifyNodeUnifiedToken(token);
+    if (identity.firebaseDecoded) {
+      req.firebaseUser = identity.firebaseDecoded;
+    }
 
     const dbUser = await getOrCreateUser({
-      uid: decodedToken.uid,
-      email: decodedToken.email || `${decodedToken.uid}@chatfxp.com`,
-      displayName: decodedToken.name,
-      avatarUrl: decodedToken.picture,
+      uid: identity.uid,
+      email: identity.email || `${identity.uid}@chatfxp.com`,
+      displayName: identity.name,
+      avatarUrl: identity.picture,
     });
 
     if (dbUser.isBanned) {
@@ -64,13 +93,15 @@ export const optionalAuth = async (req: AuthRequest, _res: Response, next: NextF
 
   const token = authHeader.split('Bearer ')[1];
   try {
-    const decodedToken = await adminAuth.verifyIdToken(token);
-    req.firebaseUser = decodedToken;
+    const identity = await verifyNodeUnifiedToken(token);
+    if (identity.firebaseDecoded) {
+      req.firebaseUser = identity.firebaseDecoded;
+    }
     const dbUser = await getOrCreateUser({
-      uid: decodedToken.uid,
-      email: decodedToken.email || `${decodedToken.uid}@chatfxp.com`,
-      displayName: decodedToken.name,
-      avatarUrl: decodedToken.picture,
+      uid: identity.uid,
+      email: identity.email || `${identity.uid}@chatfxp.com`,
+      displayName: identity.name,
+      avatarUrl: identity.picture,
     });
     if (!dbUser.isBanned) {
       req.dbUser = dbUser;

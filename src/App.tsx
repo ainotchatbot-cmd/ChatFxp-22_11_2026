@@ -5,11 +5,13 @@ import { AchievementUnlockBanner } from './components/AchievementBadge';
 import { AdminDashboardModal } from './components/AdminDashboardModal';
 import { AmbientAtmosphereEngine } from './components/AmbientAtmosphereEngine';
 import { CenterContent } from './components/CenterContent';
+import { FakeSpreadsheetDecoy } from './components/FakeSpreadsheetDecoy';
 import { FloatingWindowId } from './components/FloatingWindowFrame';
 import { GothicFooter } from './components/GothicFooter';
 import { HeroHeader } from './components/HeroHeader';
 import { LeftSidebar } from './components/LeftSidebar';
 import { NavigationBar } from './components/NavigationBar';
+import { OAuthLoginModal } from './components/OAuthLoginModal';
 import { MinimizedWindowChip, PersistentBottomBar } from './components/PersistentBottomBar';
 import { ActiveModalState, PortalModals } from './components/PortalModals';
 import { QuestsAndManaModal } from './components/QuestsAndManaModal';
@@ -26,6 +28,7 @@ import {
   resolveNearestCity,
 } from './data/pulseConfig';
 import { auth, signInWithProvider } from './lib/firebase';
+import { getOAuthProviderModule, OAUTH_PROVIDER_MODULES } from './lib/oauth-registry';
 import {
   AnnouncementRecord,
   AtmosphereMode,
@@ -46,6 +49,7 @@ import {
   NavSectionId,
   NewsItemRecord,
   NotificationRecord,
+  OAuthProviderDescriptor,
   PortalBootstrapPayload,
   PortalUser,
   PrivateMessageRecord,
@@ -132,6 +136,8 @@ export default function App() {
   const [questsModalOpen, setQuestsModalOpen] = useState(false);
   const [vaultModalOpen, setVaultModalOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [panicBlanked, setPanicBlanked] = useState(false);
+  const lastEscPressRef = useRef<number>(0);
   const [minimizedWindows, setMinimizedWindows] = useState<Record<FloatingWindowId, boolean>>({
     portal: false,
     quests: false,
@@ -261,6 +267,23 @@ export default function App() {
   const [mobileLeftOpen, setMobileLeftOpen] = useState(false);
   const [mobileRightOpen, setMobileRightOpen] = useState(false);
 
+  // Modular OAuth state (Bearer session token held strictly in memory, never localStorage)
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [loadingOAuthProvider, setLoadingOAuthProvider] = useState<AuthProviderKind | null>(null);
+  const [oauthProviders, setOAuthProviders] = useState<OAuthProviderDescriptor[]>(() =>
+    OAUTH_PROVIDER_MODULES.map((m) => ({
+      id: m.id,
+      labelHe: m.labelHe,
+      labelEn: m.labelEn,
+      strategy: m.strategy,
+      configured: m.id === 'google',
+      callbackPath: m.callbackPath,
+      badgeHe: m.badgeHe,
+      badgeEn: m.badgeEn,
+    }))
+  );
+  const oauthTokenRef = useRef<string | null>(null);
+
   const centerRef = useRef<HTMLDivElement | null>(null);
   const toastTimerRef = useRef<number | null>(null);
   const badgeTimerRef = useRef<number | null>(null);
@@ -349,12 +372,14 @@ export default function App() {
 
   const getAuthToken = useCallback(async (): Promise<string | null> => {
     const current = auth.currentUser;
-    if (!current) return null;
-    try {
-      return await current.getIdToken();
-    } catch {
-      return null;
+    if (current) {
+      try {
+        return await current.getIdToken();
+      } catch {
+        // Fallback to in-memory modular OAuth Bearer token if present
+      }
     }
+    return oauthTokenRef.current;
   }, []);
 
   const fetchBootstrap = useCallback(async () => {
@@ -465,11 +490,87 @@ export default function App() {
     document.documentElement.dir = lang === 'he' ? 'rtl' : 'ltr';
   }, [lang]);
 
+  // Fetch live modular OAuth provider status & listen for OAuth popup postMessage completion
+  useEffect(() => {
+    let active = true;
+    fetch('/api/auth/providers')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { providers?: OAuthProviderDescriptor[] } | null) => {
+        if (active && data?.providers && Array.isArray(data.providers)) {
+          setOAuthProviders(data.providers);
+        }
+      })
+      .catch(() => {
+        // Keep registry fallback defaults if server is temporarily unavailable
+      });
+
+    const handleOAuthPopupMessage = async (event: MessageEvent) => {
+      const origin = event.origin;
+      const isTrustedOrigin =
+        origin === window.location.origin ||
+        origin.endsWith('.run.app') ||
+        origin === 'https://chatfxp.com' ||
+        origin === 'https://www.chatfxp.com' ||
+        origin.includes('localhost') ||
+        origin.includes('127.0.0.1');
+      if (!isTrustedOrigin) return;
+
+      const data = event.data as
+        | {
+            type?: string;
+            provider?: AuthProviderKind;
+            token?: string;
+            user?: { uid?: string; username?: string };
+            error?: string;
+          }
+        | undefined;
+      if (!data || (data.type !== 'OAUTH_AUTH_SUCCESS' && data.type !== 'OAUTH_AUTH_ERROR')) {
+        return;
+      }
+
+      setLoadingOAuthProvider(null);
+      if (data.type === 'OAUTH_AUTH_ERROR') {
+        showToast(
+          data.error ||
+            (lang === 'he' ? 'התחברות OAuth בוטלה או נכשלה.' : 'OAuth login was cancelled or failed.')
+        );
+        return;
+      }
+
+      if (data.token) {
+        oauthTokenRef.current = data.token;
+        setAuthModalOpen(false);
+        portalWs.authenticate(data.token);
+        await fetchBootstrap();
+        const uid = data.user?.uid;
+        if (uid && claimedSessionUidRef.current !== uid) {
+          claimedSessionUidRef.current = uid;
+          void handleClaimDailyBonus(true);
+        }
+        soundEngine.playEffect('achievement');
+        const label =
+          getOAuthProviderModule(data.provider || '')?.labelEn || data.provider || 'OAuth';
+        showToast(
+          lang === 'he'
+            ? `התחברת בהצלחה ל-ChatFXP דרך ${label}!`
+            : `Signed in cleanly via ${label} modular OAuth!`
+        );
+      }
+    };
+
+    window.addEventListener('message', handleOAuthPopupMessage);
+    return () => {
+      active = false;
+      window.removeEventListener('message', handleOAuthPopupMessage);
+    };
+  }, [fetchBootstrap, handleClaimDailyBonus, lang, showToast]);
+
   // Firebase Auth listener + initial bootstrap + automatic daily login bonus
   useEffect(() => {
     void fetchBootstrap();
     const unsubAuth = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
+        oauthTokenRef.current = null;
         const token = await firebaseUser.getIdToken();
         portalWs.authenticate(token);
         await fetchBootstrap();
@@ -477,7 +578,7 @@ export default function App() {
           claimedSessionUidRef.current = firebaseUser.uid;
           void handleClaimDailyBonus(true);
         }
-      } else {
+      } else if (!oauthTokenRef.current) {
         claimedSessionUidRef.current = null;
         portalWs.authenticate(null);
         await fetchBootstrap();
@@ -560,23 +661,71 @@ export default function App() {
 
   const handleSignInWithProvider = async (provider: AuthProviderKind = 'google') => {
     haptics.trigger('tap');
+    const mod = getOAuthProviderModule(provider);
+    if (!mod) return;
+
+    if (mod.strategy === 'oauth2_popup') {
+      setLoadingOAuthProvider(provider);
+      try {
+        const res = await fetch(`/api/auth/oauth/${encodeURIComponent(provider)}/url`);
+        const data = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+        if (!res.ok || !data.url) {
+          setLoadingOAuthProvider(null);
+          showToast(
+            data.error ||
+              (lang === 'he'
+                ? `ספק ${mod.labelHe} ממתין להגדרת מפתחות שרת (Client ID/Secret). בינתיים ניתן להתחבר דרך Google.`
+                : `${mod.labelEn} OAuth awaits server Client ID/Secret env vars — use Google in the meantime.`)
+          );
+          return;
+        }
+
+        const authWindow = window.open(
+          data.url,
+          'chatfxp_oauth_popup',
+          'width=600,height=720,scrollbars=yes,resizable=yes'
+        );
+        if (!authWindow) {
+          setLoadingOAuthProvider(null);
+          showToast(
+            lang === 'he'
+              ? 'הדפדפן חסם את חלון ה-OAuth הקופץ. אפשרו חלונות קופצים לאתר ונסו שוב.'
+              : 'Popup blocked by browser. Allow popups for this site to connect your account.'
+          );
+          return;
+        }
+
+        // Clear loading indicator if user closes popup manually without authenticating
+        const pollClosed = window.setInterval(() => {
+          if (authWindow.closed) {
+            window.clearInterval(pollClosed);
+            setLoadingOAuthProvider((prev) => (prev === provider ? null : prev));
+          }
+        }, 500);
+      } catch {
+        setLoadingOAuthProvider(null);
+        showToast(lang === 'he' ? 'שגיאה בפתיחת חיבור OAuth.' : 'Failed to start modular OAuth flow.');
+      }
+      return;
+    }
+
+    setLoadingOAuthProvider(provider);
     try {
       await signInWithProvider(provider);
+      setAuthModalOpen(false);
       soundEngine.playEffect('achievement');
-      const label = provider === 'apple' ? 'Apple' : provider === 'facebook' ? 'Facebook' : 'Google';
       showToast(
         lang === 'he'
-          ? `התחברת בהצלחה ל-ChatFXP דרך ${label}! הפיד והמיקום שלך מסונכרנים.`
-          : `Signed in via ${label}! Your Opening Pulse is synced.`
+          ? `התחברת בהצלחה ל-ChatFXP דרך ${mod.labelHe}! הפיד והמיקום שלך מסונכרנים.`
+          : `Signed in via ${mod.labelEn}! Your Opening Pulse is synced.`
       );
     } catch (err: unknown) {
       const code = (err as { code?: string } | null)?.code || '';
       if (code === 'auth/operation-not-allowed' || code === 'auth/unauthorized-domain') {
-        const label = provider === 'apple' ? 'Apple' : provider === 'facebook' ? 'Facebook' : 'Google';
         showToast(
           lang === 'he'
-            ? `התחברות דרך ${label} דורשת הפעלה במסוף Firebase. בינתיים אפשר להתחבר דרך Google.`
-            : `${label} sign-in isn't enabled in Firebase console yet — try Google sign-in.`
+            ? `התחברות דרך ${mod.labelHe} דורשת הפעלה במסוף Firebase. בינתיים אפשר להתחבר דרך Google.`
+            : `${mod.labelEn} sign-in isn't enabled in Firebase console yet — try Google sign-in.`
         );
       } else if (code === 'auth/account-exists-with-different-credential') {
         showToast(
@@ -593,6 +742,8 @@ export default function App() {
       } else {
         showToast(lang === 'he' ? 'התחברות בוטלה או נכשלה.' : 'Sign in was cancelled.');
       }
+    } finally {
+      setLoadingOAuthProvider(null);
     }
   };
 
@@ -600,7 +751,13 @@ export default function App() {
 
   const handleLogout = async () => {
     haptics.trigger('tap');
-    await signOut(auth);
+    oauthTokenRef.current = null;
+    claimedSessionUidRef.current = null;
+    if (auth.currentUser) {
+      await signOut(auth);
+    }
+    portalWs.authenticate(null);
+    await fetchBootstrap();
     showToast(lang === 'he' ? 'התנתקת מהחשבון.' : 'Signed out.');
   };
 
@@ -1501,6 +1658,42 @@ export default function App() {
     vaultModalOpen,
   ]);
 
+  // Global double-Escape panic listener: clears local/session storage, removes all sensitive UI, and switches to harmless page / about:blank
+  useEffect(() => {
+    const onGlobalEscapeCheck = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      const now = Date.now();
+      if (now - lastEscPressRef.current <= 650) {
+        e.preventDefault();
+        lastEscPressRef.current = 0;
+        try {
+          window.localStorage.clear();
+          window.sessionStorage.clear();
+        } catch {
+          // Ignore storage restrictions
+        }
+        setViewer(null);
+        setMessages([]);
+        setNotifications([]);
+        setActiveModal(null);
+        setQuestsModalOpen(false);
+        setVaultModalOpen(false);
+        setAdminOpen(false);
+        setActiveThreadId(null);
+        setSearchQuery('');
+        setPanicBlanked(true);
+      } else {
+        lastEscPressRef.current = now;
+      }
+    };
+    window.addEventListener('keydown', onGlobalEscapeCheck);
+    return () => window.removeEventListener('keydown', onGlobalEscapeCheck);
+  }, []);
+
+  if (panicBlanked) {
+    return <FakeSpreadsheetDecoy onRestore={() => setPanicBlanked(false)} />;
+  }
+
   return (
     <div className="relative min-h-screen flex flex-col bg-[#050408] pb-16 text-[#F3EAF1]">
       {/* Fixed Dark-Fantasy Citadel & Carved Runes Full-Page Backdrop */}
@@ -1549,6 +1742,7 @@ export default function App() {
         onOpenProfile={() => openPortalModal({ type: 'profile' })}
         onOpenVault={openRelicVault}
         onOpenAdmin={openAdminSanctum}
+        onOpenAuthModal={() => setAuthModalOpen(true)}
         activeSection={activeSection}
         sectionHeat={sectionHeat}
         onSelectSection={handleSelectSection}
@@ -1764,6 +1958,9 @@ export default function App() {
                     onOpenAdmin={openAdminSanctum}
                     onGoogleSignIn={() => void handleGoogleSignIn()}
                     onSignInWithProvider={(provider) => void handleSignInWithProvider(provider)}
+                    oauthProviders={oauthProviders}
+                    loadingOAuthProvider={loadingOAuthProvider}
+                    onOpenAuthModal={() => setAuthModalOpen(true)}
                     onClaimDailyBonus={() => void handleClaimDailyBonus(false)}
                   />
                 </div>
@@ -1846,6 +2043,9 @@ export default function App() {
                 onOpenAdmin={openAdminSanctum}
                 onGoogleSignIn={() => void handleGoogleSignIn()}
                 onSignInWithProvider={(provider) => void handleSignInWithProvider(provider)}
+                oauthProviders={oauthProviders}
+                loadingOAuthProvider={loadingOAuthProvider}
+                onOpenAuthModal={() => setAuthModalOpen(true)}
                 onClaimDailyBonus={() => void handleClaimDailyBonus(false)}
               />
             </aside>
@@ -1925,6 +2125,9 @@ export default function App() {
               onToggleInterest={handleToggleInterest}
               onDetectLocation={handleDetectLocation}
               onSignInWithProvider={(provider) => void handleSignInWithProvider(provider)}
+              oauthProviders={oauthProviders}
+              loadingOAuthProvider={loadingOAuthProvider}
+              onOpenAuthModal={() => setAuthModalOpen(true)}
               onSelectNews={(item) => openPortalModal({ type: 'news', item })}
               onToggleRsvpEvent={(evId) => void handleToggleRsvpEvent(evId)}
               onCreateEvent={handleCreateEvent}
@@ -2162,6 +2365,16 @@ export default function App() {
           setAdminOpen(false);
         }}
         onRefreshPortal={fetchBootstrap}
+      />
+
+      {/* Modular OAuth Multi-Provider Login Hub */}
+      <OAuthLoginModal
+        open={authModalOpen}
+        lang={lang}
+        providers={oauthProviders}
+        loadingProvider={loadingOAuthProvider}
+        onSelectProvider={(provider) => void handleSignInWithProvider(provider)}
+        onClose={() => setAuthModalOpen(false)}
       />
     </div>
   );

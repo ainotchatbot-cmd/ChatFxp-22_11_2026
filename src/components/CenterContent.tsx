@@ -53,6 +53,7 @@ import {
   MarketplaceRarity,
   NavSectionId,
   NewsItemRecord,
+  OAuthProviderDescriptor,
   PollOption,
   PortalUser,
   PostItem,
@@ -145,6 +146,9 @@ interface CenterContentProps {
   onToggleInterest: (interest: PulseInterestId) => void;
   onDetectLocation: () => void;
   onSignInWithProvider: (provider: AuthProviderKind) => void;
+  oauthProviders?: OAuthProviderDescriptor[];
+  loadingOAuthProvider?: AuthProviderKind | null;
+  onOpenAuthModal?: () => void;
   onSelectNews: (news: NewsItemRecord) => void;
   onToggleRsvpEvent: (eventId: number) => void;
   onCreateEvent: (payload: {
@@ -227,6 +231,9 @@ export const CenterContent: React.FC<CenterContentProps> = ({
   onToggleInterest,
   onDetectLocation,
   onSignInWithProvider,
+  oauthProviders,
+  loadingOAuthProvider,
+  onOpenAuthModal,
   onSelectNews,
   onToggleRsvpEvent,
   onCreateEvent,
@@ -1388,6 +1395,9 @@ export const CenterContent: React.FC<CenterContentProps> = ({
           onDetectLocation={onDetectLocation}
           locating={locating}
           onSignInWithProvider={onSignInWithProvider}
+          oauthProviders={oauthProviders}
+          loadingOAuthProvider={loadingOAuthProvider}
+          onOpenAuthModal={onOpenAuthModal}
           onSelectSection={onSelectSection}
           onOpenThreadInline={(threadId) => onOpenThreadInline(threadId)}
           onSelectNews={onSelectNews}

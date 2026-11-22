@@ -23,16 +23,14 @@ import {
   xpTransactions,
 } from './schema.ts';
 
-let seedPromise: Promise<void> | null = null;
+let seedCompleted = false;
 
 export async function ensureSeeded(): Promise<void> {
-  if (!seedPromise) {
-    seedPromise = runSeed().catch((err) => {
-      seedPromise = null;
-      throw err;
-    });
+  if (seedCompleted) {
+    return;
   }
-  return seedPromise;
+  await runSeed();
+  seedCompleted = true;
 }
 
 async function ensureFanBasesAndVaultSeeded(): Promise<void> {

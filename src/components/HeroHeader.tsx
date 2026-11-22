@@ -25,7 +25,7 @@ export const HeroHeader: React.FC<HeroHeaderProps> = ({ lang, equippedBanner, on
       >
         <PortalImage
           src={PORTAL_ASSETS.heroBg}
-          alt="ChatFXP.com — Hooded Warrior, Gothic Sorceress & Halfling Wizard Guardians"
+          alt="ChatFXP.com — Hooded Warrior, Gothic Sorceress & Fit Bodybuilder Wizard Guardians"
           className="h-full w-full object-cover object-[50%_18%] transition-transform duration-700 group-hover:scale-[1.012]"
         />
 

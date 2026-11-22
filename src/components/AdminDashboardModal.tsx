@@ -5,6 +5,7 @@ import {
   CheckCircle2,
   Compass,
   Crown,
+  Flame,
   FolderPlus,
   Lock,
   Megaphone,
@@ -20,6 +21,7 @@ import {
 } from 'lucide-react';
 import { formatRelativeTime } from '../data/portalData';
 import {
+  ActivityHeatmapPayload,
   FanBaseRecord,
   ForumCategoryRecord,
   LanguageCode,
@@ -30,6 +32,7 @@ import {
 } from '../types';
 import { FloatingWindowFrame } from './FloatingWindowFrame';
 import { PortalImage } from './GothicDecor';
+import { SectionActivityHeatmap } from './SectionActivityHeatmap';
 
 interface AdminOverviewResponse {
   stats: {
@@ -67,6 +70,8 @@ interface AdminOverviewResponse {
     publisherId: string;
     enabled: boolean;
   };
+  sectionHeat?: Record<string, number>;
+  activityHeatmap?: ActivityHeatmapPayload;
 }
 
 interface AdminDashboardModalProps {
@@ -101,7 +106,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
   onRefreshPortal,
 }) => {
   const [tab, setTab] = useState<
-    'users' | 'threads' | 'forums' | 'marketplace' | 'adsense' | 'reports' | 'announcements' | 'rss' | 'logs'
+    'users' | 'heatmap' | 'threads' | 'forums' | 'marketplace' | 'adsense' | 'reports' | 'announcements' | 'rss' | 'logs'
   >('users');
   const [overview, setOverview] = useState<AdminOverviewResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -306,6 +311,7 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
         {(
           [
             { id: 'users', labelHe: 'משתמשים וכינויים', labelEn: 'Users & Nicknames', icon: Users },
+            { id: 'heatmap', labelHe: 'מד חום פעילות', labelEn: 'Section Heatmap', icon: Flame },
             { id: 'threads', labelHe: 'ניהול דיונים', labelEn: 'Threads', icon: Pin },
             { id: 'forums', labelHe: 'תתי-פורומים', labelEn: 'Subforums', icon: FolderPlus },
             { id: 'marketplace', labelHe: 'מודעות שוק', labelEn: 'Marketplace', icon: ShoppingBag },
@@ -345,10 +351,20 @@ export const AdminDashboardModal: React.FC<AdminDashboardModalProps> = ({
               {statusBanner}
             </div>
           )}
-          {loading && !overview && (
+          {loading && !overview && tab !== 'heatmap' && (
             <p className="py-8 text-center text-xs text-[#A89BA8]">
               {lang === 'he' ? 'טוען נתוני מערכת...' : 'Loading telemetry...'}
             </p>
+          )}
+
+          {tab === 'heatmap' && (
+            <SectionActivityHeatmap
+              data={overview?.activityHeatmap}
+              sectionHeat={overview?.sectionHeat}
+              lang={lang}
+              loading={loading}
+              onRefresh={() => void loadOverview()}
+            />
           )}
 
           {overview && tab === 'users' && (

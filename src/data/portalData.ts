@@ -8,7 +8,7 @@ import {
 } from '../types';
 
 export const PORTAL_ASSETS = {
-  heroBg: '/src/assets/images/hero_sanctum_trio_1795318660950.jpg',
+  heroBg: '/src/assets/images/hero_sanctum_trinity_final_1795351707260.jpg',
   pageBackdrop: '/src/assets/images/bg_sanctum_citadel_1795235236960.jpg',
   bannerArena: '/src/assets/images/banner_warband_arena_1795235235383.jpg',
   couplePortrait: '/src/assets/images/sidebar_couple_portrait_1795233154661.jpg',

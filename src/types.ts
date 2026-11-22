@@ -3,7 +3,20 @@ import type { EndorsementCategory } from './data/reputation';
 
 export type LanguageCode = 'he' | 'en';
 
-export type AuthProviderKind = 'google' | 'apple' | 'facebook';
+export type AuthProviderKind = 'google' | 'apple' | 'facebook' | 'github' | 'discord';
+
+export type OAuthProviderStrategy = 'firebase' | 'oauth2_popup';
+
+export interface OAuthProviderDescriptor {
+  id: AuthProviderKind;
+  labelHe: string;
+  labelEn: string;
+  strategy: OAuthProviderStrategy;
+  configured: boolean;
+  callbackPath: string;
+  badgeHe: string;
+  badgeEn: string;
+}
 
 export type OpeningPulseTab = 'for-you' | 'communities' | 'news' | 'near-me';
 
@@ -461,3 +474,32 @@ export interface GlobalSearchResults {
   }[];
 }
 
+export interface ActivityHeatmapCell {
+  sectionId: string;
+  labelHe: string;
+  labelEn: string;
+  hour: number;
+  count: number;
+  intensity: number;
+}
+
+export interface ActivityHeatmapSectionSummary {
+  sectionId: string;
+  labelHe: string;
+  labelEn: string;
+  heatScore: number;
+  totalEvents: number;
+  peakHour: number;
+}
+
+export interface ActivityHeatmapPayload {
+  timezone: string;
+  sections: ActivityHeatmapSectionSummary[];
+  cells: ActivityHeatmapCell[];
+  hourlyTotals: number[];
+  hourlyEventCounts: number[];
+  totalEvents: number;
+  maxCellIntensity: number;
+  peakHour: number;
+  peakSectionId: string;
+}

@@ -18,6 +18,7 @@ import {
   Upload,
 } from 'lucide-react';
 import { LanguageCode } from '../types';
+import { FakeSpreadsheetDecoy } from './FakeSpreadsheetDecoy';
 import { GeometricSigil } from './GeometricSigil';
 
 type ShadowBurnMode = 'none' | '5m' | '1h' | '24h' | 'burn_after_read';
@@ -342,52 +343,16 @@ export const ShadowZonePortal: React.FC<ShadowZonePortalProps> = ({ lang, onExit
     }
   };
 
-  // Benign Quick-Exit Decoy Overlay (No window.open / iframe navigation failure)
+  // Convincing Spreadsheet Decoy Overlay (clears storage & hides sensitive UI)
   if (panicActive) {
     return (
-      <div className="min-h-[75vh] rounded-lg border border-slate-200 bg-slate-50 p-6 sm:p-10 text-slate-900 shadow-lg">
-        <div className="mx-auto max-w-2xl rounded-xl border border-slate-200 bg-white p-6">
-          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-4">
-            <div>
-              <h2 className="text-lg font-bold text-slate-800">Daily Forecast &amp; Local Checklist</h2>
-              <p className="text-xs text-slate-500">Local session storage cleared · Standard utility view</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPanicActive(false)}
-                className="rounded border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 cursor-pointer"
-              >
-                {isHe ? 'חזור למצב אנונימי' : 'Re-enter Safe Zone'}
-              </button>
-              <button
-                type="button"
-                onClick={onExitSafeZone}
-                className="rounded bg-slate-800 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-700 cursor-pointer"
-              >
-                {isHe ? 'חזרה לפורטל הראשי' : 'Return to Portal'}
-              </button>
-            </div>
-          </div>
-
-          <div className="mt-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="rounded-lg border border-sky-100 bg-sky-50 p-4">
-              <p className="text-xs font-semibold text-sky-700">Morning</p>
-              <p className="mt-1 text-2xl font-bold text-slate-800">19°C</p>
-              <p className="text-xs text-slate-600">Clear skies</p>
-            </div>
-            <div className="rounded-lg border border-amber-100 bg-amber-50 p-4">
-              <p className="text-xs font-semibold text-amber-700">Afternoon</p>
-              <p className="mt-1 text-2xl font-bold text-slate-800">24°C</p>
-              <p className="text-xs text-slate-600">Light coastal wind</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-100 p-4">
-              <p className="text-xs font-semibold text-slate-700">Evening</p>
-              <p className="mt-1 text-2xl font-bold text-slate-800">16°C</p>
-              <p className="text-xs text-slate-600">54% humidity</p>
-            </div>
-          </div>
-        </div>
+      <div className="rounded-lg overflow-hidden border border-slate-300 shadow-lg">
+        <FakeSpreadsheetDecoy
+          onRestore={() => setPanicActive(false)}
+          onReturnPortal={onExitSafeZone}
+          restoreLabel={isHe ? 'חזור למצב אנונימי' : 'Re-enter Safe Zone'}
+          returnLabel={isHe ? 'חזרה לפורטל' : 'Exit to Portal'}
+        />
       </div>
     );
   }
@@ -428,13 +393,23 @@ export const ShadowZonePortal: React.FC<ShadowZonePortalProps> = ({ lang, onExit
 
         <div className="flex flex-wrap items-center gap-2">
           <a
+            href="/midnight-lounge.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 rounded border border-purple-500/45 bg-[#141419] px-2.5 py-1.5 font-mono text-[11px] text-purple-300 hover:border-cyan-400 transition-colors whitespace-nowrap"
+          >
+            <FileCode2 className="w-3.5 h-3.5" />
+            <span>{isHe ? 'Midnight Lounge (עב/EN)' : 'Midnight Lounge HTML'}</span>
+          </a>
+
+          <a
             href="/shadow-zone-prototype.html"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 rounded border border-slate-700 bg-[#121318] px-2.5 py-1.5 font-mono text-[11px] text-cyan-300 hover:border-cyan-400 transition-colors whitespace-nowrap"
           >
             <FileCode2 className="w-3.5 h-3.5" />
-            <span>{isHe ? 'אב-טיפוס HTML נפרד' : 'Standalone HTML Prototype'}</span>
+            <span>{isHe ? 'אב-טיפוס Safe Zone' : 'Safe Zone Prototype'}</span>
           </a>
 
           <button

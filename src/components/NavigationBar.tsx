@@ -14,6 +14,7 @@ import {
   Hash,
   HeartHandshake,
   Home,
+  KeyRound,
   Lightbulb,
   LogOut,
   Maximize2,
@@ -65,6 +66,7 @@ interface NavigationBarProps {
   onOpenProfile: () => void;
   onOpenVault: () => void;
   onOpenAdmin: () => void;
+  onOpenAuthModal?: () => void;
   activeSection: NavSectionId;
   sectionHeat?: Record<string, number>;
   onSelectSection: (section: NavSectionId) => void;
@@ -150,6 +152,7 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
   onOpenProfile,
   onOpenVault,
   onOpenAdmin,
+  onOpenAuthModal,
   activeSection,
   sectionHeat,
   onSelectSection,
@@ -440,6 +443,17 @@ export const NavigationBar: React.FC<NavigationBarProps> = ({
                   ? 'ניהול'
                   : 'Admin'}
               </span>
+            </button>
+          )}
+
+          {!viewer && onOpenAuthModal && (
+            <button
+              type="button"
+              onClick={onOpenAuthModal}
+              className="gothic-crimson-btn flex items-center gap-1.5 rounded border border-[#D4A64A]/55 px-2.5 py-1.5 text-[11px] font-bold text-white cursor-pointer whitespace-nowrap"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-[#FFE39A]" />
+              <span>{lang === 'he' ? 'התחברות' : 'Sign In'}</span>
             </button>
           )}
 
