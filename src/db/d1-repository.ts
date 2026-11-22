@@ -1501,10 +1501,28 @@ export async function d1AdminUpdateUserRoleOrBan(
     db.select().from(users).where(eq(users.id, params.targetUserId)).limit(1),
   ]);
   if (!target) return null;
-  if (params.role && ['super_admin', 'administrator'].includes(params.role)) {
-    if (!actor || !['super_admin', 'administrator'].includes(actor.role)) {
-      throw new Error('רק מנהל-על או אדמיניסטרטור רשאי להעניק דרגת ניהול עליונה.');
-    }
+  const validRoles = ['member', 'moderator', 'senior_moderator', 'administrator', 'super_admin'];
+  if (params.role && !validRoles.includes(params.role)) {
+    throw new Error('Invalid role.');
+  }
+  const actorRole = actor?.role ?? 'member';
+  const isSuperAdmin = actorRole === 'super_admin';
+  const isAdmin = actorRole === 'administrator' || isSuperAdmin;
+  const isModerator = actorRole === 'moderator' || actorRole === 'senior_moderator';
+  if (params.role && !isAdmin) {
+    throw new Error('Only administrators may change roles.');
+  }
+  if (params.role === 'super_admin' && !isSuperAdmin) {
+    throw new Error('Only a super administrator may grant super-admin access.');
+  }
+  if (target.role === 'super_admin' && !isSuperAdmin) {
+    throw new Error('Only a super administrator may modify another super administrator.');
+  }
+  if (!isSuperAdmin && target.role === 'administrator' && !isAdmin) {
+    throw new Error('Insufficient permissions to modify an administrator.');
+  }
+  if (isModerator && target.role !== 'member') {
+    throw new Error('Moderators may only moderate regular members.');
   }
   const now = new Date();
   const nextRole = params.role ?? target.role;
