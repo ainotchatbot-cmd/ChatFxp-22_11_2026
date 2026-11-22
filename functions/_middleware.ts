@@ -9,6 +9,7 @@ interface PagesMiddlewareContext {
 }
 
 /**
+ * Production bindings: D1 database, stable OAuth signing key, and Shadow HMAC key.
  * Run ChatFXP's existing API dispatcher inside Pages Functions.
  * Static pages and public assets continue through Pages' asset pipeline.
  */
