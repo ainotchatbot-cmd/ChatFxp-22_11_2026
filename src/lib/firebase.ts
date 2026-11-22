@@ -7,7 +7,7 @@ import {
   signInWithPopup,
   UserCredential,
 } from 'firebase/auth';
-import firebaseConfig from '../../firebase-applet-config.json' with { type: 'json' };
+import firebaseConfig from '../../firebase-applet-config.json';
 import type { AuthProviderKind } from '../types';
 
 const app = initializeApp(firebaseConfig);
