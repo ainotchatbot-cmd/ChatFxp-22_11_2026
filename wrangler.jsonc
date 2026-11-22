@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "chatfxp-com",
   "main": "src/worker.ts",
-  "compatibility_date": "2026-11-01",
+  "compatibility_date": "2026-11-23",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
   "assets": {
@@ -11,24 +11,14 @@
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*", "/auth/*", "/ws", "/robots.txt", "/sitemap.xml"]
   },
-  // Native Cloudflare Workers AI binding (POST /api/ai/edge-assist)
   "ai": {
     "binding": "AI"
   },
-  // Native Cloudflare D1 relational database (create once: npx wrangler d1 create chatfxp-db)
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "chatfxp-db",
-      "database_id": "REPLACE_WITH_YOUR_D1_DATABASE_ID",
-      "migrations_dir": "drizzle"
-    }
-  ],
-  // Native Cloudflare R2 Object Storage (create once: npx wrangler r2 bucket create chatfxp-media)
-  "r2_buckets": [
-    {
-      "binding": "MEDIA_BUCKET",
-      "bucket_name": "chatfxp-media"
+      "database_name": "chatfxp-production",
+      "database_id": "b312a7d6-08bb-4f11-a243-7ec572d1e07e"
     }
   ],
   "routes": [
@@ -42,6 +32,7 @@
     }
   ],
   "vars": {
+    "APP_URL": "https://chatfxp.com",
     "SITE_ORIGIN": "https://chatfxp.com"
   }
 }
