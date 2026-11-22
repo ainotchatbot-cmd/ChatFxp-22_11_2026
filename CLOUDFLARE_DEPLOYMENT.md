@@ -1,29 +1,59 @@
 # ChatFXP Cloudflare deployment
 
-## Frontend hosting
+## Current architecture
 
-- Cloudflare Pages project: `chatfxp-portal`
-- GitHub source: `ainotchatbot-cmd/ChatFxp-22_11_2026`
-- Production branch: `main`
-- Build command: `npm run build`
-- Build output: `dist`
-- Production domains: `https://chatfxp.com` and `https://www.chatfxp.com` (www redirects to the apex domain)
+- GitHub repository: `ainotchatbot-cmd/ChatFxp-22_11_2026`
+- Production Worker: `chatfxp-com`
+- Production hostnames: `chatfxp.com` and `www.chatfxp.com` (the Worker redirects www to apex)
+- Frontend build: Vite `npm run build` → `dist`
+- Worker entry point: `src/worker.ts`
+- Database: Cloudflare D1 `chatfxp-production` (APAC)
+- AI: Cloudflare Workers AI binding `AI`
 
-Pushing to `main` triggers a production Pages build and deployment.
+The Worker serves static Vite assets and handles API routes in `src/worker-api.ts`. The Node/Express `server.ts` is for local development/legacy Node deployment and is not the production entry point.
 
-## Important: backend is not deployed by Pages
+## GitHub Actions deployment
 
-This repository also contains a Node/Express API, a PostgreSQL/Drizzle data layer, Firebase Admin authentication, and a WebSocket server. The current Pages project is configured as a static Vite deployment and has no Pages Functions/Worker runtime (`uses_functions: false`). The Pages build does **not** run `server.ts`, PostgreSQL, or the `/ws` WebSocket endpoint. The configured D1 binding does not automatically translate the PostgreSQL/Drizzle code to D1.
+Workflow: `.github/workflows/deploy-cloudflare.yml`
 
-Consequently, the public frontend can load from Pages, but database-backed features, API requests under `/api/*`, and real-time features will not work until the backend is separately deployed and the frontend's same-origin API/WebSocket paths are routed to it.
+On pushes to `main`, it builds the app. If the following GitHub repository secrets exist, it also applies the idempotent D1 schema and deploys the Worker:
 
-## Backend requirements before declaring the full app production-ready
+- `CF_API_TOKEN`: Cloudflare API token with Workers Scripts Write, D1 Write, and Workers Routes permissions for this account/zone.
+- `CF_ACCOUNT_ID`: Cloudflare account ID.
 
-1. Deploy the existing Node server to a Node-compatible host (or port the API deliberately to Cloudflare Workers/Pages Functions and D1). A static Pages deployment alone is insufficient.
-2. Provide a managed PostgreSQL database reachable from that backend, or complete and test a migration of the schema and repository layer to D1.
-3. Configure secrets outside Git: `SQL_HOST`, `SQL_USER`, `SQL_PASSWORD`, `SQL_DB_NAME`, Firebase Admin service-account credentials, and any required AI/API credentials.
-4. Set Firebase authorized domains to `chatfxp.com` and `www.chatfxp.com`.
-5. Route `/api/*` and `/ws` from the public domain to the backend; preserve WebSocket upgrades.
-6. Verify `GET /api/health`, sign-in, bootstrap, write operations, and WebSocket authentication before calling the full application live.
+You can also run the workflow manually from GitHub Actions.
 
-Never commit production credentials or service-account JSON files.
+## Production database
+
+A new, isolated D1 database was provisioned for this repository: `chatfxp-production`. Its schema from `drizzle/d1_full_schema.sql` has been applied. Existing databases were intentionally not reused because their schemas belong to other projects.
+
+The SQL file uses `CREATE TABLE/INDEX IF NOT EXISTS`, so the workflow can safely reapply it.
+
+## Secrets and integrations still needed
+
+Configure Worker secrets in Cloudflare (Worker → Settings → Variables and Secrets) before enabling the corresponding features:
+
+- `SHADOW_HMAC_SECRET`: use a long random secret; do not leave the ephemeral fallback in production.
+- `OAUTH_SESSION_SECRET`: long random secret for OAuth state/session signing.
+- `GITHUB_CLIENT_ID` and `GITHUB_CLIENT_SECRET`: optional GitHub OAuth.
+- `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET`: optional Discord OAuth.
+- `SUPER_ADMIN_EMAILS`: comma-separated verified administrator emails; do not rely on sample/demo users.
+- AI provider credentials: only add the credentials for providers you actually enable.
+
+Firebase's client config is public by design; still configure the authorized domain list in Firebase Authentication to include `chatfxp.com` and `www.chatfxp.com`.
+
+## Storage limitation
+
+R2 is not currently activated on this Cloudflare account, so the Worker is deployed without an R2 binding. Media upload/storage features need R2 enabled and a bucket/binding added later. Do not store credentials in Git.
+
+## Production checklist
+
+- [ ] Add `CF_API_TOKEN` and `CF_ACCOUNT_ID` to GitHub repository secrets.
+- [ ] Trigger the deployment workflow and verify the build and Worker deployment succeed.
+- [ ] Confirm `https://chatfxp.com` and `https://www.chatfxp.com` load; www redirects to apex.
+- [ ] Verify `GET /api/health`, portal bootstrap, sign-in, a database write/read, and WebSocket behavior.
+- [ ] Configure OAuth and administrator secrets; test the auth callback.
+- [ ] Enable R2 and test media upload/download.
+- [ ] Review seeded demo data and admin-role setup before opening the site to public users.
+
+Never commit production credentials, API keys, or service-account JSON files.
