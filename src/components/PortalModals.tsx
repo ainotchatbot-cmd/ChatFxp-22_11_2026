@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   Award,
-  BarChart3,
   Bell,
   Bookmark,
   Check,
@@ -62,10 +61,14 @@ import {
   WeatherMode,
 } from '../types';
 import { portalWs } from '../utils/wsClient';
+import type { AmbientMixerLayerId, AmbientMixerLayers } from '../utils/soundEngine';
+import { DEFAULT_AMBIENT_LAYERS } from '../utils/soundEngine';
 import { AchievementBadgeCard } from './AchievementBadge';
+import { AmbientMixerPanel } from './AmbientMixerPanel';
 import { CosmeticUsername } from './CosmeticUsername';
 import { FloatingWindowFrame } from './FloatingWindowFrame';
 import { FeatureCardArt, GoldCrownIcon, PortalImage } from './GothicDecor';
+import { QuickPoll } from './QuickPoll';
 import { DailyStreakChip, OccultEssenceIcon, ReputationTierIcon } from './ReputationIndicator';
 
 export type ActiveModalState =
@@ -134,6 +137,14 @@ interface PortalModalsProps {
   displayScale?: DisplayScaleMode;
   onDisplayScaleChange?: (mode: DisplayScaleMode) => void;
   onOpenVault?: () => void;
+  masterVolume?: number;
+  ambientVolume?: number;
+  ambientLayers?: AmbientMixerLayers;
+  onMasterVolumeChange?: (v: number) => void;
+  onAmbientVolumeChange?: (v: number) => void;
+  onLayerVolumeChange?: (layer: AmbientMixerLayerId, v: number) => void;
+  onApplyAmbientPreset?: (layers: AmbientMixerLayers) => void;
+  onAuditionAmbientLayer?: (layer: AmbientMixerLayerId) => void;
 }
 
 const MARKETPLACE_PRESET_IMAGES = [
@@ -193,6 +204,14 @@ export const PortalModals: React.FC<PortalModalsProps> = ({
   displayScale = 'auto',
   onDisplayScaleChange,
   onOpenVault,
+  masterVolume = 0.55,
+  ambientVolume = 0.5,
+  ambientLayers = DEFAULT_AMBIENT_LAYERS,
+  onMasterVolumeChange,
+  onAmbientVolumeChange,
+  onLayerVolumeChange,
+  onApplyAmbientPreset,
+  onAuditionAmbientLayer,
 }) => {
   // Thread Detail State
   const [threadDetail, setThreadDetail] = useState<ThreadSummary | null>(null);
@@ -983,39 +1002,16 @@ export const PortalModals: React.FC<PortalModalsProps> = ({
 
               {/* Poll Section */}
               {threadDetail.pollQuestion && pollOptions.length > 0 && (
-                <div className="mt-4 rounded border border-[#D4A64A]/35 bg-[#120A13] p-4">
-                  <div className="flex items-center gap-2 text-xs font-bold text-[#D4A64A] mb-3">
-                    <BarChart3 className="w-4 h-4" />
-                    <span>{threadDetail.pollQuestion}</span>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {(() => {
-                      const totalVotes = pollOptions.reduce((sum, o) => sum + o.votes, 0);
-                      return pollOptions.map((opt, idx) => {
-                        const pct = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
-                        return (
-                          <button
-                            key={opt.label}
-                            type="button"
-                            onClick={() => void handleVotePoll(idx)}
-                            className="relative overflow-hidden rounded border border-[#C5BAC7]/20 bg-[#070609] px-3 py-2 text-start text-xs hover:border-[#FF142B] cursor-pointer"
-                          >
-                            <div
-                              className="absolute inset-y-0 start-0 bg-[#FF142B]/20"
-                              style={{ width: `${pct}%` }}
-                            />
-                            <div className="relative flex items-center justify-between">
-                              <span className="font-medium text-white">{opt.label}</span>
-                              <span className="font-mono text-[11px] text-[#D4A64A]">
-                                {pct}% ({opt.votes})
-                              </span>
-                            </div>
-                          </button>
-                        );
-                      });
-                    })()}
-                  </div>
-                </div>
+                <QuickPoll
+                  threadId={threadDetail.id}
+                  question={threadDetail.pollQuestion}
+                  options={pollOptions}
+                  lang={lang}
+                  variant="inline"
+                  onVote={async (_tid, idx) => {
+                    await handleVotePoll(idx);
+                  }}
+                />
               )}
 
               {/* Report Inline Form */}
@@ -2313,25 +2309,28 @@ export const PortalModals: React.FC<PortalModalsProps> = ({
                 </div>
               )}
 
+              <AmbientMixerPanel
+                lang={lang}
+                soundEnabled={soundEnabled}
+                masterVolume={masterVolume}
+                ambientVolume={ambientVolume}
+                layers={ambientLayers}
+                onToggleSound={onToggleSound}
+                onMasterVolumeChange={(v) => onMasterVolumeChange?.(v)}
+                onAmbientVolumeChange={(v) => onAmbientVolumeChange?.(v)}
+                onLayerVolumeChange={(layer, v) => onLayerVolumeChange?.(layer, v)}
+                onApplyPreset={(preset) => onApplyAmbientPreset?.(preset)}
+                onAuditionLayer={(layer) => onAuditionAmbientLayer?.(layer)}
+              />
+
               <div className="flex items-center justify-between rounded border border-[#C5BAC7]/20 bg-[#070609] p-3.5">
                 <div>
-                  <p className="text-xs font-bold text-[#F3EAF1]">מנוע שמע ואווירה גותית</p>
-                  <p className="text-[11px] text-[#A89BA8]">אפקטי צליל ומוזיקת אווירה אימרסיבית</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={onToggleSound}
-                  className={`rounded px-3.5 py-1.5 text-xs font-bold cursor-pointer ${
-                    soundEnabled ? 'bg-[#FF142B] text-white' : 'gothic-slate-btn text-[#A89BA8]'
-                  }`}
-                >
-                  {soundEnabled ? 'פעיל' : 'כבוי'}
-                </button>
-              </div>
-              <div className="flex items-center justify-between rounded border border-[#C5BAC7]/20 bg-[#070609] p-3.5">
-                <div>
-                  <p className="text-xs font-bold text-[#F3EAF1]">משוב רטט במובייל (Haptics)</p>
-                  <p className="text-[11px] text-[#A89BA8]">רטט עדין בלחיצות והתראות</p>
+                  <p className="text-xs font-bold text-[#F3EAF1]">
+                    {lang === 'he' ? 'משוב רטט במובייל (Haptics)' : 'Mobile Haptics Feedback'}
+                  </p>
+                  <p className="text-[11px] text-[#A89BA8]">
+                    {lang === 'he' ? 'רטט עדין בלחיצות והתראות' : 'Subtle tactile pulse on actions & alerts'}
+                  </p>
                 </div>
                 <button
                   type="button"
@@ -2340,7 +2339,7 @@ export const PortalModals: React.FC<PortalModalsProps> = ({
                     hapticsEnabled ? 'bg-[#D4A64A] text-black' : 'gothic-slate-btn text-[#A89BA8]'
                   }`}
                 >
-                  {hapticsEnabled ? 'פעיל' : 'כבוי'}
+                  {hapticsEnabled ? (lang === 'he' ? 'פעיל' : 'ON') : lang === 'he' ? 'כבוי' : 'OFF'}
                 </button>
               </div>
             </div>

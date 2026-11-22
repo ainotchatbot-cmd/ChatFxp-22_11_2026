@@ -18,6 +18,8 @@ import {
   MessageSquare,
   Pin,
   Plus,
+  Radio,
+  RefreshCw,
   Send,
   ShieldAlert,
   ShoppingBag,
@@ -61,11 +63,13 @@ import {
   ViewLayoutMode,
 } from '../types';
 import { useResponsiveContext } from '../utils/ResponsiveContext';
+import { soundEngine } from '../utils/soundEngine';
 import { CommunitySponsorWindow } from './CommunitySponsorWindow';
 import { CosmeticUsername } from './CosmeticUsername';
 import { FanBaseSection } from './FanBaseSection';
 import { FeatureCardArt, GothicCorners, PortalImage } from './GothicDecor';
 import { OpeningPulse } from './OpeningPulse';
+import { QuickPoll } from './QuickPoll';
 import { ReputationTierIcon } from './ReputationIndicator';
 import { SwipeCarousel } from './SwipeCarousel';
 
@@ -250,6 +254,7 @@ export const CenterContent: React.FC<CenterContentProps> = ({
     onControlledForumSlugChange?.(slug);
   };
   const [threadSort, setThreadSort] = useState<'hot' | 'most-viewed' | 'recent'>('hot');
+  const [spotlightPollIdx, setSpotlightPollIdx] = useState(0);
   const [marketCategory, setMarketCategory] = useState<string>('all');
   const [marketGothicTag, setMarketGothicTag] = useState<GothicMarketplaceTag>('all');
   const [marketSort, setMarketSort] = useState<'rare-first' | 'recent' | 'price-asc' | 'price-desc'>('rare-first');
@@ -270,6 +275,12 @@ export const CenterContent: React.FC<CenterContentProps> = ({
   const [inlineReplyText, setInlineReplyText] = useState('');
   const [replyToPostId, setReplyToPostId] = useState<number | null>(null);
   const [replySubmitting, setReplySubmitting] = useState(false);
+  const [liveUpdatesEnabled, setLiveUpdatesEnabled] = useState(false);
+  const [liveChecking, setLiveChecking] = useState(false);
+  const [lastLiveSyncAt, setLastLiveSyncAt] = useState<Date | null>(null);
+  const [newRepliesNoticeCount, setNewRepliesNoticeCount] = useState(0);
+  const [highlightedPostIds, setHighlightedPostIds] = useState<number[]>([]);
+  const knownPostIdsRef = useRef<Set<number>>(new Set());
 
   // Reset forum pill filter when switching major sections & pre-select relevant forum in Quick Composer
   useEffect(() => {
@@ -295,20 +306,47 @@ export const CenterContent: React.FC<CenterContentProps> = ({
     }
   }, [selectedForumSlug, forums]);
 
-  // Fetch inline wide thread detail whenever activeThreadId changes
-  const refreshInlineThread = async (tid: number) => {
-    setInlineLoading(true);
+  // Fetch inline wide thread detail whenever activeThreadId changes or polls
+  const refreshInlineThread = async (
+    tid: number,
+    options?: { silent?: boolean; notifyNew?: boolean }
+  ) => {
+    const isSilent = Boolean(options?.silent);
+    if (isSilent) {
+      setLiveChecking(true);
+    } else {
+      setInlineLoading(true);
+    }
     try {
       const res = await fetch(`/api/threads/${tid}`);
       if (res.ok) {
         const data = (await res.json()) as { thread: ThreadSummary; posts: PostItem[] };
+        const nextPosts = data.posts || [];
+        const prevKnown = knownPostIdsRef.current;
+        const newlyArrivedIds =
+          options?.notifyNew && prevKnown.size > 0
+            ? nextPosts.filter((p) => !prevKnown.has(p.id)).map((p) => p.id)
+            : [];
+
+        knownPostIdsRef.current = new Set(nextPosts.map((p) => p.id));
         setInlineThread(data.thread);
-        setInlinePosts(data.posts || []);
+        setInlinePosts(nextPosts);
+        setLastLiveSyncAt(new Date());
+
+        if (newlyArrivedIds.length > 0) {
+          setNewRepliesNoticeCount((prev) => prev + newlyArrivedIds.length);
+          setHighlightedPostIds((prev) => Array.from(new Set([...prev, ...newlyArrivedIds])));
+          soundEngine.playSubtleNotify();
+        }
       }
     } catch {
       // Keep fallback summary
     } finally {
-      setInlineLoading(false);
+      if (isSilent) {
+        setLiveChecking(false);
+      } else {
+        setInlineLoading(false);
+      }
     }
   };
 
@@ -317,12 +355,36 @@ export const CenterContent: React.FC<CenterContentProps> = ({
       setInlineThread(null);
       setInlinePosts([]);
       setReplyToPostId(null);
+      knownPostIdsRef.current = new Set();
+      setNewRepliesNoticeCount(0);
+      setHighlightedPostIds([]);
+      setLastLiveSyncAt(null);
       return;
     }
-    const summary = threads.find((t) => t.id === activeThreadId) || null;
-    if (summary) setInlineThread(summary);
+    knownPostIdsRef.current = new Set();
+    setNewRepliesNoticeCount(0);
+    setHighlightedPostIds([]);
+    setLastLiveSyncAt(null);
     void refreshInlineThread(activeThreadId);
+  }, [activeThreadId]);
+
+  useEffect(() => {
+    if (!activeThreadId) return;
+    const summary = threads.find((t) => t.id === activeThreadId) || null;
+    if (summary) {
+      setInlineThread((prev) => (prev && prev.id === summary.id ? { ...prev, ...summary } : summary));
+    }
   }, [activeThreadId, threads]);
+
+  // 30-second Live Updates polling for active thread view
+  useEffect(() => {
+    if (!activeThreadId || !liveUpdatesEnabled) return;
+    const timerId = window.setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      void refreshInlineThread(activeThreadId, { silent: true, notifyNew: true });
+    }, 30_000);
+    return () => window.clearInterval(timerId);
+  }, [activeThreadId, liveUpdatesEnabled]);
 
   useEffect(() => {
     if (isCarouselPaused) return;
@@ -426,6 +488,27 @@ export const CenterContent: React.FC<CenterContentProps> = ({
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
   }, [threads, normalizedQuery, selectedForumSlug, activeSection, threadSort]);
+
+  const activePollThreads = useMemo(() => {
+    const items: { thread: ThreadSummary; options: PollOption[] }[] = [];
+    for (const t of filteredThreads) {
+      if (!t.pollQuestion || !t.pollOptionsJson) continue;
+      try {
+        const parsed = JSON.parse(t.pollOptionsJson) as PollOption[];
+        if (Array.isArray(parsed) && parsed.length >= 2) {
+          items.push({ thread: t, options: parsed });
+        }
+      } catch {
+        // Skip malformed poll JSON
+      }
+    }
+    return items;
+  }, [filteredThreads]);
+
+  const activeSpotlightPoll =
+    activePollThreads.length > 0
+      ? activePollThreads[spotlightPollIdx % activePollThreads.length]
+      : null;
 
   const marketCategories = useMemo(() => {
     return Array.from(new Set(marketplaceItems.map((m) => m.category)));
@@ -819,7 +902,47 @@ export const CenterContent: React.FC<CenterContentProps> = ({
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              aria-pressed={liveUpdatesEnabled}
+              onClick={() => {
+                const next = !liveUpdatesEnabled;
+                setLiveUpdatesEnabled(next);
+                if (next) {
+                  soundEngine.unlockContext();
+                  soundEngine.playClick();
+                  void refreshInlineThread(inlineThread.id, { silent: true, notifyNew: true });
+                }
+              }}
+              className={`flex items-center gap-1.5 rounded border px-3 py-1.5 text-xs font-semibold cursor-pointer whitespace-nowrap transition-colors ${
+                liveUpdatesEnabled
+                  ? 'border-[#D4A64A] bg-[#D4A64A]/20 text-[#FFE39A] shadow-[0_0_12px_rgba(212,166,74,0.22)]'
+                  : 'border-[#C5BAC7]/25 bg-[#0A070D] text-[#C5BAC7] hover:border-[#D4A64A]/60 hover:text-white'
+              }`}
+            >
+              <Radio className={`w-3.5 h-3.5 ${liveUpdatesEnabled ? 'text-[#D4A64A]' : 'text-[#A89BA8]'}`} />
+              <span>
+                {lang === 'he'
+                  ? liveUpdatesEnabled
+                    ? 'עדכון חי פעיל (30 שנ׳)'
+                    : 'עדכון חי (30 שנ׳)'
+                  : liveUpdatesEnabled
+                  ? 'Live Updates On (30s)'
+                  : 'Live Updates'}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => void refreshInlineThread(inlineThread.id, { silent: true, notifyNew: true })}
+              title={lang === 'he' ? 'בדוק תגובות חדשות עכשיו' : 'Check for new replies now'}
+              className="flex items-center gap-1 rounded border border-[#C5BAC7]/25 bg-[#0A070D] px-2.5 py-1.5 text-xs font-semibold text-[#C5BAC7] hover:border-[#D4A64A] hover:text-white cursor-pointer whitespace-nowrap"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${liveChecking ? 'animate-spin text-[#D4A64A]' : ''}`} />
+              <span className="hidden sm:inline">{lang === 'he' ? 'בדוק עכשיו' : 'Sync'}</span>
+            </button>
+
             <button
               type="button"
               onClick={onToggleViewLayout}
@@ -1001,51 +1124,63 @@ export const CenterContent: React.FC<CenterContentProps> = ({
             {inlineThread.content}
           </div>
 
-          {/* Interactive Poll */}
+          {/* Interactive D3 Quick-Poll */}
           {inlineThread.pollQuestion && pollOptions.length > 0 && (
-            <div className="mt-4 rounded border border-[#D4A64A]/35 bg-[#120A13] p-4">
-              <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[#D4A64A] mb-3">
-                <BarChart3 className="w-4 h-4" />
-                <span>{inlineThread.pollQuestion}</span>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {(() => {
-                  const totalVotes = pollOptions.reduce((sum, o) => sum + o.votes, 0);
-                  return pollOptions.map((opt, idx) => {
-                    const pct = totalVotes > 0 ? Math.round((opt.votes / totalVotes) * 100) : 0;
-                    return (
-                      <button
-                        key={opt.label}
-                        type="button"
-                        onClick={async () => {
-                          await onVotePoll(inlineThread.id, idx);
-                          await refreshInlineThread(inlineThread.id);
-                        }}
-                        className="relative overflow-hidden rounded border border-[#C5BAC7]/20 bg-[#070609] px-3 py-2.5 text-start text-xs hover:border-[#FF142B] cursor-pointer"
-                      >
-                        <div
-                          className="absolute inset-y-0 start-0 bg-[#FF142B]/20"
-                          style={{ width: `${pct}%` }}
-                        />
-                        <div className="relative flex items-center justify-between gap-2">
-                          <span className="font-medium text-white">{opt.label}</span>
-                          <span className="font-mono text-[11px] text-[#D4A64A] tabular-nums">
-                            {pct}% ({opt.votes})
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  });
-                })()}
-              </div>
-            </div>
+            <QuickPoll
+              threadId={inlineThread.id}
+              question={inlineThread.pollQuestion}
+              options={pollOptions}
+              lang={lang}
+              variant="inline"
+              onVote={async (tid, idx) => {
+                await onVotePoll(tid, idx);
+                await refreshInlineThread(tid);
+              }}
+            />
           )}
 
           {/* Replies Section */}
           <div className="mt-6 border-t border-[#FF142B]/25 pt-5">
-            <h2 className="text-sm font-bold text-[#D4A64A] mb-3">
-              {lang === 'he' ? `תגובות בדיון (${inlinePosts.length})` : `Replies (${inlinePosts.length})`}
-            </h2>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-sm font-bold text-[#D4A64A]">
+                {lang === 'he' ? `תגובות בדיון (${inlinePosts.length})` : `Replies (${inlinePosts.length})`}
+              </h2>
+
+              {lastLiveSyncAt && (
+                <span className="text-[11px] text-[#A89BA8]">
+                  {liveUpdatesEnabled
+                    ? lang === 'he'
+                      ? 'סנכרון אוטומטי כל 30 שנ׳ · עודכן '
+                      : 'Polling every 30s · Synced '
+                    : lang === 'he'
+                    ? 'עודכן ב-'
+                    : 'Synced '}
+                  <span className="font-mono tabular-nums" dir="ltr">
+                    {lastLiveSyncAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </span>
+                </span>
+              )}
+            </div>
+
+            {newRepliesNoticeCount > 0 && (
+              <div className="mb-3 flex items-center justify-between gap-2 rounded border border-[#D4A64A]/55 bg-[#1D130B] px-3.5 py-2 text-xs text-[#FFE39A]">
+                <span className="font-semibold">
+                  {lang === 'he'
+                    ? `נוספו ${newRepliesNoticeCount} תגובות חדשות בדיון`
+                    : `${newRepliesNoticeCount} new ${newRepliesNoticeCount === 1 ? 'reply' : 'replies'} arrived`}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNewRepliesNoticeCount(0);
+                    setHighlightedPostIds([]);
+                  }}
+                  className="rounded border border-[#D4A64A]/45 px-2.5 py-0.5 text-[11px] font-bold text-[#FFE39A] hover:bg-[#D4A64A] hover:text-black cursor-pointer whitespace-nowrap"
+                >
+                  {lang === 'he' ? 'סמן כנקרא' : 'Dismiss'}
+                </button>
+              </div>
+            )}
 
             {inlineLoading && inlinePosts.length === 0 ? (
               <p className="py-4 text-xs text-[#A89BA8]">
@@ -1057,11 +1192,15 @@ export const CenterContent: React.FC<CenterContentProps> = ({
               </p>
             ) : (
               <div className="flex flex-col gap-3">
-                {inlinePosts.map((rep) => (
+                {inlinePosts.map((rep) => {
+                  const isNewlyArrived = highlightedPostIds.includes(rep.id);
+                  return (
                   <div
                     key={rep.id}
-                    className={`rounded border p-3.5 ${
-                      rep.parentPostId
+                    className={`rounded border p-3.5 transition-colors ${
+                      isNewlyArrived
+                        ? 'border-[#D4A64A]/75 bg-[#1A120D]'
+                        : rep.parentPostId
                         ? 'ms-6 border-[#FF142B]/30 bg-[#160D15]'
                         : 'border-[#C5BAC7]/15 bg-[#0E0910]'
                     }`}
@@ -1119,7 +1258,8 @@ export const CenterContent: React.FC<CenterContentProps> = ({
                       {rep.content}
                     </p>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 
@@ -1742,6 +1882,48 @@ export const CenterContent: React.FC<CenterContentProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Active Thread Quick-Poll Spotlight */}
+            {activeSpotlightPoll && activeSpotlightPoll.thread.pollQuestion && (
+              <div className="border-b border-[#D4A64A]/25 bg-[#09060C] p-3.5 sm:p-4">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-[11px] font-bold text-[#FFE39A]">
+                    <BarChart3 className="w-3.5 h-3.5 text-[#D4A64A]" />
+                    <span>
+                      {lang === 'he' ? 'סקר מהיר מתוך הדיונים הפעילים' : 'Active Thread Quick-Poll'}
+                    </span>
+                  </div>
+                  {activePollThreads.length > 1 && (
+                    <div className="flex items-center gap-1.5 text-[11px]">
+                      <span className="font-mono tabular-nums text-[#A89BA8]">
+                        {(spotlightPollIdx % activePollThreads.length) + 1} / {activePollThreads.length}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setSpotlightPollIdx((prev) => (prev + 1) % activePollThreads.length)
+                        }
+                        className="rounded border border-[#C5BAC7]/20 bg-[#120B13] px-2 py-0.5 text-[11px] font-semibold text-[#D4A64A] hover:border-[#D4A64A] cursor-pointer"
+                      >
+                        {lang === 'he' ? 'לסקר הבא' : 'Next Poll'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <QuickPoll
+                  threadId={activeSpotlightPoll.thread.id}
+                  threadTitle={activeSpotlightPoll.thread.title}
+                  question={activeSpotlightPoll.thread.pollQuestion}
+                  options={activeSpotlightPoll.options}
+                  lang={lang}
+                  variant="spotlight"
+                  onVote={async (tid, idx) => {
+                    await onVotePoll(tid, idx);
+                  }}
+                  onOpenThread={(tid) => onOpenThreadInline(tid)}
+                />
+              </div>
+            )}
 
             {recommendedLayout === 'mobile-stack' || isMobile ? (
               <div className="flex flex-col gap-2.5 p-3">

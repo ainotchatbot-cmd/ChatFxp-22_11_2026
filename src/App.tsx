@@ -224,6 +224,7 @@ export default function App() {
   const [masterVolume, setMasterVolume] = useState(() => soundEngine.getState().masterVolume);
   const [ambientVolume, setAmbientVolume] = useState(() => soundEngine.getState().ambientVolume);
   const [effectsVolume, setEffectsVolume] = useState(() => soundEngine.getState().effectsVolume);
+  const [ambientLayers, setAmbientLayers] = useState(() => soundEngine.getState().layerVolumes);
   const [fxEnabled, setFxEnabled] = useState<boolean>(() => {
     try {
       const saved = window.localStorage.getItem('chatfxp_fx_enabled');
@@ -2288,6 +2289,32 @@ export default function App() {
           const next = !hapticsEnabled;
           setHapticsEnabled(next);
           haptics.setEnabled(next);
+        }}
+        masterVolume={masterVolume}
+        ambientVolume={ambientVolume}
+        ambientLayers={ambientLayers}
+        onMasterVolumeChange={(v) => {
+          setMasterVolume(v);
+          soundEngine.setMasterVolume(v);
+        }}
+        onAmbientVolumeChange={(v) => {
+          setAmbientVolume(v);
+          soundEngine.setAmbientVolume(v);
+        }}
+        onLayerVolumeChange={(layer, v) => {
+          soundEngine.setLayerVolume(layer, v);
+          setAmbientLayers(soundEngine.getLayerVolumes());
+        }}
+        onApplyAmbientPreset={(preset) => {
+          soundEngine.setLayerVolumes(preset);
+          setAmbientLayers(soundEngine.getLayerVolumes());
+        }}
+        onAuditionAmbientLayer={(layer) => {
+          if (!soundEnabled) {
+            setSoundEnabled(true);
+            soundEngine.setEnabled(true);
+          }
+          soundEngine.auditionLayer(layer);
         }}
         onFilterBySection={(sectionId) => {
           setActiveThreadId(null);
