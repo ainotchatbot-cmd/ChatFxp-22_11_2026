@@ -1,6 +1,6 @@
 FROM node:22-bookworm-slim AS build
 WORKDIR /app
-COPY package.json bun.lock* package-lock.json* ./
+COPY package.json ./
 RUN npm install
 COPY . .
 RUN npm run build
