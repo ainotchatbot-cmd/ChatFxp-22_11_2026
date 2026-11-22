@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CLOUDFLARE_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+      CLOUDFLARE_ACCOUNT_ID: e23e01ea5a995a732c3114d712f34a42
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
