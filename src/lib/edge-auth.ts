@@ -1,6 +1,6 @@
 import { isModularOAuthToken, verifyModularOAuthToken } from './oauth-server.ts';
 import type { OAuthEnvConfig } from './oauth-server.ts';
-import firebaseConfig from '../../firebase-applet-config.json' with { type: 'json' };
+import firebaseConfig from '../../firebase-applet-config.json';
 
 const FIREBASE_JWKS_URL =
   'https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com';
